@@ -11,6 +11,7 @@ import {
   DriverIcon,
   CloseIcon,
   BroomIcon,
+  RouteIcon,
 } from './Icons';
 import { ROUTES } from '../routes/paths';
 import { canAccessModule } from '../utils/access';
@@ -80,6 +81,14 @@ const modules = [
     label: 'Sweeper Monitoring',
     icon: BroomIcon,
     idleIcon: 'bg-gradient-to-br from-lime-50 to-green-100 text-green-700',
+    activeIcon: 'bg-white/20 text-white shadow-inner',
+  },
+  {
+    path: ROUTES.distanceReport,
+    moduleKey: 'distanceReports',
+    label: 'Distance Report',
+    icon: RouteIcon,
+    idleIcon: 'bg-gradient-to-br from-blue-50 to-cyan-100 text-blue-600',
     activeIcon: 'bg-white/20 text-white shadow-inner',
   },
   {

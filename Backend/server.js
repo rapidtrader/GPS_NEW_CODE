@@ -6,6 +6,7 @@ const authRoutes = require('./routes/auth');
 const vehicleRoutes = require('./routes/vehicles');
 const driverRoutes = require('./routes/drivers');
 const analyticsRoutes = require('./routes/analytics');
+const { startScheduler, stopScheduler } = require('./services/scheduler');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -34,10 +35,15 @@ app.use('/api/auth', authRoutes);
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/drivers', driverRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/distance-reports', require('./routes/distance-reports'));
 
 async function start() {
   try {
     await connectDB();
+    
+    // Start GPS data synchronization scheduler
+    startScheduler();
+    
     app.listen(PORT, () => {
       // Dev
       // console.log(`Backend running on http://localhost:${PORT}`);
@@ -52,3 +58,16 @@ async function start() {
 }
 
 start();
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully...');
+  stopScheduler();
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received, shutting down gracefully...');
+  stopScheduler();
+  process.exit(0);
+});

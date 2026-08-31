@@ -9,6 +9,7 @@ export const ROUTES = {
   map: '/map',
   users: '/users',
   sweeperMonitoring: '/sweeper-monitoring',
+  distanceReport: '/distance-report',
   login: '/login',
   signup: '/signup',
 };
@@ -24,4 +25,5 @@ export const ROUTE_TITLES = {
   [ROUTES.map]: 'Live Map Tracking',
   [ROUTES.users]: 'User Management',
   [ROUTES.sweeperMonitoring]: 'Sweeper Monitoring',
+  [ROUTES.distanceReport]: 'Distance Report',
 };

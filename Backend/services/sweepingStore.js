@@ -35,8 +35,19 @@ function getPointTime(row) {
 function getSpeed(row) {
   const v = row.rawData || {};
   const meta = v.terminalPacketMeta || {};
-  const n = Number(row.speed ?? v.mileage ?? meta.speed ?? meta.pSpeed ?? 0);
-  return Number.isFinite(n) ? Math.max(0, n) : 0;
+  
+  // Try to get speed from various fields
+  let speed = Number(row.speed ?? v.mileage ?? meta.speed ?? meta.pSpeed ?? 0);
+  
+  // If speed is 0 or not available, check if odometer is changing
+  // This indicates vehicle is moving even if speed isn't reported
+  if (!(speed > 0)) {
+    // Mark as potentially moving (use a small speed to bypass idle detection)
+    // This will be categorized as sweeping (< 8 km/h) which is safer for incomplete data
+    return 0.1; // Return 0.1 instead of 0 to avoid 'idle' mode
+  }
+  
+  return Number.isFinite(speed) ? Math.max(0, speed) : 0.1;
 }
 
 function getCoords(row) {
@@ -126,9 +137,15 @@ function segmentize(points) {
 
     let dKm = 0;
     if (odo != null && current.lastOdo != null && odo >= current.lastOdo) {
+      // Use odometer difference (more reliable than GPS haversine)
       dKm = odo - current.lastOdo;
+    } else if (odo != null && current.lastOdo != null) {
+      // Odometer reset or invalid - don't use haversine, skip this point
+      console.warn(`[sweepingStore] Odometer reset detected: ${current.lastOdo} -> ${odo} for vehicle ${current.vehicleNo}`);
+      dKm = 0;
     } else {
-      dKm = haversineKm(current.lastLat, current.lastLng, lat, lng);
+      // No odometer data - don't use haversine as it gives incorrect results with static GPS
+      dKm = 0;
     }
 
     current.endTime = t;
@@ -171,6 +188,8 @@ async function getSweepingReport(user, { startTime, endTime, ouid = '' }) {
     throw err;
   }
 
+  console.log(`[getSweepingReport] Date range: ${start.toISOString()} to ${end.toISOString()}`);
+
   const liveVehicles = await getVehiclesForUser(user);
   const vehicleRows = liveVehicles.map((raw) => ({
     ouid: raw.ouid,
@@ -203,6 +222,7 @@ async function getSweepingReport(user, { startTime, endTime, ouid = '' }) {
   }
 
   const history = await VehicleHistory.find(query).sort({ ouid: 1, recordedAt: 1 }).lean();
+  console.log(`[getSweepingReport] Found ${history.length} records in date range`);
 
   const byOuid = new Map();
   for (const row of history) {

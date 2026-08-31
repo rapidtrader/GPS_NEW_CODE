@@ -93,3 +93,11 @@ export function BroomIcon({ className = 'h-5 w-5', strokeWidth = 1.5 }) {
     </svg>
   );
 }
+
+export function RouteIcon({ className = 'h-5 w-5', strokeWidth = 1.5 }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={strokeWidth}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 6l6 6m0 0l6-6m-6 6v12m-6-12l-6 6m6-6v12" />
+    </svg>
+  );
+}

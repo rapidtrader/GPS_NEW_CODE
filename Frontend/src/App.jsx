@@ -16,6 +16,7 @@ import Reports from './pages/Reports';
 import Analytics from './pages/Analytics';
 import LiveMap from './pages/LiveMap';
 import SweeperMonitoring from './pages/SweeperMonitoring';
+import DistanceReport from './pages/DistanceReport';
 import UserManagement from './pages/UserManagement';
 import { ROUTES } from './routes/paths';
 
@@ -50,6 +51,9 @@ function AppRoutes() {
           </Route>
           <Route element={<ModuleRoute moduleKey="sweeperMonitoring" />}>
             <Route path={ROUTES.sweeperMonitoring} element={<SweeperMonitoring />} />
+          </Route>
+          <Route element={<ModuleRoute moduleKey="distanceReports" />}>
+            <Route path={ROUTES.distanceReport} element={<DistanceReport />} />
           </Route>
           <Route element={<AdminRoute />}>
             <Route element={<ModuleRoute moduleKey="liveVehicles" />}>

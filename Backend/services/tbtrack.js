@@ -11,9 +11,12 @@ const USERNAME = process.env.TBTRACK_USERNAME;
 const PASSWORD = process.env.TBTRACK_PASSWORD;
 
 const TOKEN_BUFFER_MS = 60 * 1000; // refresh 1 min before expiry
+const LOGIN_RETRY_DELAY_MS = 5 * 60 * 1000; // 5 minutes retry delay after failure
 
 let cachedToken = null;
 let tokenExpiresAt = 0;
+let lastLoginAttemptTime = 0;
+let loginFailureCount = 0;
 
 function decodeTokenExpiry(token) {
   try {
@@ -33,32 +36,60 @@ function isTokenValid() {
 function clearTokenCache() {
   cachedToken = null;
   tokenExpiresAt = 0;
+  // Don't reset failure count here - keep it for rate limiting
 }
 
 async function loginAndCacheToken() {
-  const response = await fetch(SIGNIN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: USERNAME, password: PASSWORD }),
-  });
-
-  const result = await response.json();
-
-  if (result.status !== 'OK' || !result.data?.token) {
-    throw new Error(result.message || 'TBTrack sign in failed');
+  const now = Date.now();
+  
+  // Rate limiting: Don't attempt login too frequently after failure
+  if (loginFailureCount > 0 && now - lastLoginAttemptTime < LOGIN_RETRY_DELAY_MS) {
+    const waitTime = Math.ceil((LOGIN_RETRY_DELAY_MS - (now - lastLoginAttemptTime)) / 1000);
+    console.warn(`[TBTrack] ⏰ Rate limit: Too many login attempts. Please wait ${waitTime}s before retry`);
+    throw new Error(`Too many login attempts. Retry after ${waitTime}s`);
   }
 
-  cachedToken = result.data.token;
-  const exp = decodeTokenExpiry(cachedToken);
-  tokenExpiresAt = exp || Date.now() + 24 * 60 * 60 * 1000;
+  lastLoginAttemptTime = now;
+  console.log('[TBTrack] 🔐 Getting new token from TBTrack...');
+  
+  try {
+    const response = await fetch(SIGNIN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: USERNAME, password: PASSWORD }),
+    });
 
-  return cachedToken;
+    const result = await response.json();
+
+    if (result.status !== 'OK' || !result.data?.token) {
+      loginFailureCount++;
+      console.error('[TBTrack] ❌ Login failed:', result.message);
+      throw new Error(result.message || 'TBTrack sign in failed');
+    }
+
+    // Reset failure count on successful login
+    loginFailureCount = 0;
+    
+    cachedToken = result.data.token;
+    const exp = decodeTokenExpiry(cachedToken);
+    tokenExpiresAt = exp || Date.now() + 24 * 60 * 60 * 1000;
+
+    console.log('[TBTrack] ✅ Token received and cached successfully');
+    console.log(`[TBTrack] Token expires at: ${new Date(tokenExpiresAt).toLocaleString()}`);
+
+    return cachedToken;
+  } catch (error) {
+    console.error('[TBTrack] 💥 Token request error:', error.message);
+    throw error;
+  }
 }
 
 async function getAuthToken() {
   if (isTokenValid()) {
+    console.log('[TBTrack] Using cached token (valid)');
     return cachedToken;
   }
+  console.log('[TBTrack] Token invalid or expired, requesting new one...');
   return loginAndCacheToken();
 }
 
@@ -113,10 +144,12 @@ async function fetchWithAuth(url, options = {}) {
 }
 
 async function fetchVehicleList() {
+  console.log('[TBTrack] Fetching vehicle list...');
   let token = await getAuthToken();
   let result = await fetchVehicleListWithToken(token);
 
   if (result.unauthorized) {
+    console.warn('[TBTrack] ⚠️ Token unauthorized (401/403), clearing cache and retrying...');
     clearTokenCache();
     token = await loginAndCacheToken();
     result = await fetchVehicleListWithToken(token);
@@ -126,6 +159,7 @@ async function fetchVehicleList() {
     }
   }
 
+  console.log(`[TBTrack] ✅ Vehicle list fetched: ${Array.isArray(result.data) ? result.data.length : 0} vehicles`);
   return result.data;
 }
 

@@ -117,10 +117,12 @@ async function syncVehicleData() {
     }
     
     const duration = Date.now() - startTime;
-    console.log(`[Scheduler] GPS sync completed successfully in ${duration}ms`);
+    console.log(`[Scheduler] ✅ GPS sync completed successfully in ${duration}ms`);
   } catch (error) {
-    console.error('[Scheduler] Error syncing GPS data:', error.message);
-    console.error('[Scheduler] Stack:', error.stack);
+    console.error('[Scheduler] ❌ Error syncing GPS data:', error.message);
+    if (error.message.includes('Too many login') || error.message.includes('Rate limit')) {
+      console.error('[Scheduler] 🚫 TBTrack rate limit hit. Scheduler will retry on next interval.');
+    }
   } finally {
     isSyncing = false;
   }

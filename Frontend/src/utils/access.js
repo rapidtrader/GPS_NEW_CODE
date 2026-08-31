@@ -9,6 +9,7 @@ const ROUTE_MODULE_MAP = {
   [ROUTES.analytics]: 'analytics',
   [ROUTES.map]: 'map',
   [ROUTES.reports]: 'reports',
+  [ROUTES.sweeperMonitoring]: 'sweeperMonitoring',
   [ROUTES.liveVehicles]: 'liveVehicles',
   [ROUTES.users]: 'users',
 };
@@ -43,6 +44,7 @@ export function getDefaultRoute(user) {
     'analytics',
     'map',
     'reports',
+    'sweeperMonitoring',
     'liveVehicles',
     'users',
   ];

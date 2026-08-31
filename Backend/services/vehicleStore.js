@@ -58,6 +58,7 @@ async function saveVehicles(vehicles) {
       latitude: doc.latitude,
       longitude: doc.longitude,
       battery: doc.battery,
+      speed: doc.mileage ?? v.mileage ?? null,
       rawData: v,
     });
   });

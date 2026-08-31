@@ -15,6 +15,7 @@ const {
   saveVehicleDetails,
   getSavedVehicleDetails,
 } = require('../services/vehicleDetailStore');
+const { getSweepingReport } = require('../services/sweepingStore');
 
 const router = express.Router();
 
@@ -49,6 +50,27 @@ router.get('/', authMiddleware, adminMiddleware, requireModule('liveVehicles'), 
     res.json({ status: 'OK', code: 200, data: filtered, source: 'live' });
   } catch (error) {
     res.status(500).json({ status: 'ERROR', message: error.message });
+  }
+});
+
+router.get('/sweeping', authMiddleware, requireModule('sweeperMonitoring'), async (req, res) => {
+  try {
+    const startTime = Number(req.query.startTime);
+    const endTime = Number(req.query.endTime);
+    const ouid = req.query.ouid || '';
+
+    if (!startTime || !endTime) {
+      return res.status(400).json({
+        status: 'ERROR',
+        message: 'startTime and endTime query params are required',
+      });
+    }
+
+    const data = await getSweepingReport(req.user, { startTime, endTime, ouid });
+    res.json({ status: 'OK', code: 200, data, source: 'database' });
+  } catch (error) {
+    const status = error.statusCode || 500;
+    res.status(status).json({ status: 'ERROR', message: error.message });
   }
 });
 

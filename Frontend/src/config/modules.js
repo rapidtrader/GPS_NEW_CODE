@@ -6,6 +6,7 @@ export const USER_MODULES = [
   { key: 'analytics', label: 'Analytics' },
   { key: 'map', label: 'Live Map' },
   { key: 'reports', label: 'Reports' },
+  { key: 'sweeperMonitoring', label: 'Sweeper Monitoring' },
 ];
 
 export const MODULE_LABELS = Object.fromEntries(

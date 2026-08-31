@@ -6,6 +6,7 @@ const USER_MODULES = [
   'analytics',
   'map',
   'reports',
+  'sweeperMonitoring',
 ];
 
 const ADMIN_MODULES = ['liveVehicles', 'users'];

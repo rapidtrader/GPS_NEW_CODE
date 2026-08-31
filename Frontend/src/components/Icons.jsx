@@ -85,3 +85,11 @@ export function CloseIcon({ className = 'h-5 w-5', strokeWidth = 1.5 }) {
     </svg>
   );
 }
+
+export function BroomIcon({ className = 'h-5 w-5', strokeWidth = 1.5 }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={strokeWidth}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.75l8.5 8.5M5.25 20.25c1.5-3 3.75-5.25 7.5-5.25 1.5 0 2.75.4 3.75 1.05l-4.2 4.2H5.25zM14 6.5l3.5 3.5" />
+    </svg>
+  );
+}

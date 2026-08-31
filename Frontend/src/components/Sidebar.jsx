@@ -10,6 +10,7 @@ import {
   ClipboardIcon,
   DriverIcon,
   CloseIcon,
+  BroomIcon,
 } from './Icons';
 import { ROUTES } from '../routes/paths';
 import { canAccessModule } from '../utils/access';
@@ -71,6 +72,14 @@ const modules = [
     label: 'Live Map',
     icon: MapIcon,
     idleIcon: 'bg-gradient-to-br from-rose-50 to-pink-100 text-rose-600',
+    activeIcon: 'bg-white/20 text-white shadow-inner',
+  },
+  {
+    path: ROUTES.sweeperMonitoring,
+    moduleKey: 'sweeperMonitoring',
+    label: 'Sweeper Monitoring',
+    icon: BroomIcon,
+    idleIcon: 'bg-gradient-to-br from-lime-50 to-green-100 text-green-700',
     activeIcon: 'bg-white/20 text-white shadow-inner',
   },
   {

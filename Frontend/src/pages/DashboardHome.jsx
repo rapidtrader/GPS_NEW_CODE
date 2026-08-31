@@ -10,7 +10,7 @@ import {
 } from '../api';
 import { AnalyticsBarChart, AnalyticsMetricCard } from '../components/AnalyticsCharts';
 import { getStateClass } from '../components/VehicleCard';
-import { ChartIcon, DatabaseIcon, MapIcon, TruckIcon } from '../components/Icons';
+import { ChartIcon, DatabaseIcon, MapIcon, TruckIcon, BroomIcon } from '../components/Icons';
 import { VehicleIcon } from '../components/VehicleIcons';
 import { ROUTES } from '../routes/paths';
 import { canAccessModule, getModuleKeyForPath } from '../utils/access';
@@ -62,6 +62,7 @@ const QUICK_LINK_META = {
   [ROUTES.map]: { icon: MapIcon, color: 'from-emerald-500 to-teal-700' },
   [ROUTES.analytics]: { icon: ChartIcon, color: 'from-orange-400 to-amber-600' },
   [ROUTES.reports]: { icon: ChartIcon, color: 'from-yellow-400 to-orange-500' },
+  [ROUTES.sweeperMonitoring]: { icon: BroomIcon, color: 'from-green-500 to-emerald-700' },
 };
 
 export default function DashboardHome() {
@@ -213,6 +214,7 @@ export default function DashboardHome() {
     { path: ROUTES.map, label: 'Live Map', desc: 'Track on map' },
     { path: ROUTES.analytics, label: 'Analytics', desc: 'Mileage & duration insights' },
     { path: ROUTES.reports, label: 'Reports', desc: 'Fleet analytics' },
+    { path: ROUTES.sweeperMonitoring, label: 'Sweeper Monitoring', desc: 'Sweeping vs travel GPS' },
   ].filter((link) => canAccessModule(user, getModuleKeyForPath(link.path)));
 
   return (

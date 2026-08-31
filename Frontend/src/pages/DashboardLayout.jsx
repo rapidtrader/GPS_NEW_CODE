@@ -35,6 +35,7 @@ export default function DashboardLayout() {
   const title = ROUTE_TITLES[location.pathname] || 'Dashboard';
   const fullBleed = location.pathname === ROUTES.map;
   const isDashboard = location.pathname === ROUTES.dashboard;
+  const isSweeper = location.pathname === ROUTES.sweeperMonitoring;
 
   return (
     <Layout
@@ -42,7 +43,7 @@ export default function DashboardLayout() {
       onLogout={handleLogout}
       title={title}
       fullBleed={fullBleed}
-      hideVehicleBanner={isDashboard}
+      hideVehicleBanner={isDashboard || isSweeper}
       headerContent={
         isDashboard ? (
           <DashboardHeader user={user} headerActions={headerActions} />

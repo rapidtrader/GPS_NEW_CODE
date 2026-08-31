@@ -178,6 +178,19 @@ export async function fetchSavedAnalytics({ startTime, endTime, ouid = '', ouids
   return handleResponse(response);
 }
 
+export async function fetchSweepingReport({ startTime, endTime, ouid = '' }) {
+  const params = new URLSearchParams({
+    startTime: String(startTime),
+    endTime: String(endTime),
+  });
+  if (ouid) params.set('ouid', ouid);
+
+  const response = await fetch(`${API_BASE}/api/vehicles/sweeping?${params}`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(response);
+}
+
 export async function fetchReports(snapshotId = '') {
   const params = snapshotId ? `?snapshotId=${encodeURIComponent(snapshotId)}` : '';
   const response = await fetch(`${API_BASE}/api/analytics/reports${params}`, {

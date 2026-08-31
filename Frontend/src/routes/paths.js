@@ -1,0 +1,25 @@
+export const ROUTES = {
+  dashboard: '/',
+  liveVehicles: '/live-vehicles',
+  savedVehicles: '/saved-vehicles',
+  vehicleDetails: '/vehicle-details',
+  driverList: '/driver-list',
+  reports: '/reports',
+  analytics: '/analytics',
+  map: '/map',
+  users: '/users',
+  login: '/login',
+  signup: '/signup',
+};
+
+export const ROUTE_TITLES = {
+  [ROUTES.dashboard]: 'Dashboard',
+  [ROUTES.liveVehicles]: 'Live Vehicles',
+  [ROUTES.savedVehicles]: 'Saved Data',
+  [ROUTES.vehicleDetails]: 'Vehicle Details',
+  [ROUTES.driverList]: 'Driver List',
+  [ROUTES.reports]: 'Reports',
+  [ROUTES.analytics]: 'Analytics',
+  [ROUTES.map]: 'Live Map Tracking',
+  [ROUTES.users]: 'User Management',
+};

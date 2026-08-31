@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+body {
+  @apply min-h-screen bg-white text-black font-sans antialiased;
+}
+
+#root {
+  @apply min-h-screen bg-white;
+}
+
+.leaflet-container {
+  height: 100% !important;
+  width: 100% !important;
+  background: #f3f4f6;
+}
+
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 400 !important;
+}
+
+.vehicle-map-marker img {
+  width: 26px !important;
+  height: 26px !important;
+  max-width: 26px !important;
+  max-height: 26px !important;
+  object-fit: contain !important;
+}
+
+.vehicle-list-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #4a3068 #e5e7eb;
+}
+
+.vehicle-list-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.vehicle-list-scroll::-webkit-scrollbar-track {
+  background: #e5e7eb;
+  border-radius: 4px;
+}
+
+.vehicle-list-scroll::-webkit-scrollbar-thumb {
+  background: #4a3068;
+  border-radius: 4px;
+}
+
+.vehicle-list-scroll::-webkit-scrollbar-thumb:hover {
+  background: #3d2858;
+}

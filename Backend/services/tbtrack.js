@@ -10,27 +10,56 @@ const ANALYTICS_DASHBOARD_URL =
 const USERNAME = process.env.TBTRACK_USERNAME;
 const PASSWORD = process.env.TBTRACK_PASSWORD;
 
-const TOKEN_BUFFER_MS = 60 * 1000; // refresh 1 min before expiry
+const TOKEN_BUFFER_MS = 5 * 60 * 1000; // refresh 5 min before expiry
+const DEFAULT_TOKEN_VALIDITY_MS = 12 * 60 * 60 * 1000; // Assume 12 hours if can't decode
 const LOGIN_RETRY_DELAY_MS = 5 * 60 * 1000; // 5 minutes retry delay after failure
 
 let cachedToken = null;
 let tokenExpiresAt = 0;
 let lastLoginAttemptTime = 0;
 let loginFailureCount = 0;
+let tokenAcquisitionTime = 0;
 
 function decodeTokenExpiry(token) {
   try {
     const part = token.split('.')[1];
-    const json = Buffer.from(part, 'base64url').toString('utf8');
+    if (!part) return null;
+    
+    // Add padding if needed
+    const padding = 4 - (part.length % 4);
+    const paddedPart = padding < 4 ? part + '='.repeat(padding) : part;
+    
+    const json = Buffer.from(paddedPart, 'base64').toString('utf8');
     const payload = JSON.parse(json);
-    return payload.exp ? payload.exp * 1000 : null;
-  } catch {
+    
+    if (payload.exp) {
+      const expiryTime = payload.exp * 1000;
+      console.log(`[TBTrack] 📅 Token expiry decoded: ${new Date(expiryTime).toLocaleString()}`);
+      return expiryTime;
+    }
+    return null;
+  } catch (err) {
+    console.warn(`[TBTrack] ⚠️ Could not decode token expiry: ${err.message}`);
     return null;
   }
 }
 
 function isTokenValid() {
-  return cachedToken && Date.now() < tokenExpiresAt - TOKEN_BUFFER_MS;
+  if (!cachedToken) return false;
+  
+  const now = Date.now();
+  const timeRemaining = tokenExpiresAt - now;
+  const isValid = timeRemaining > TOKEN_BUFFER_MS;
+  
+  if (isValid) {
+    const minutesRemaining = Math.floor(timeRemaining / 1000 / 60);
+    console.log(`[TBTrack] ✅ Token is valid (expires in ${minutesRemaining} minutes)`);
+  } else {
+    const minutesExpired = Math.floor((TOKEN_BUFFER_MS - timeRemaining) / 1000 / 60);
+    console.log(`[TBTrack] ❌ Token expired or expiring soon (will refresh in ${minutesExpired} minutes)`);
+  }
+  
+  return isValid;
 }
 
 function clearTokenCache() {
@@ -45,18 +74,19 @@ async function loginAndCacheToken() {
   // Rate limiting: Don't attempt login too frequently after failure
   if (loginFailureCount > 0 && now - lastLoginAttemptTime < LOGIN_RETRY_DELAY_MS) {
     const waitTime = Math.ceil((LOGIN_RETRY_DELAY_MS - (now - lastLoginAttemptTime)) / 1000);
-    console.warn(`[TBTrack] ⏰ Rate limit: Too many login attempts. Please wait ${waitTime}s before retry`);
-    throw new Error(`Too many login attempts. Retry after ${waitTime}s`);
+    console.warn(`[TBTrack] ⏰ Rate limit active: Please wait ${waitTime}s before next login attempt`);
+    throw new Error(`Rate limited. Retry after ${waitTime}s`);
   }
 
   lastLoginAttemptTime = now;
-  console.log('[TBTrack] 🔐 Getting new token from TBTrack...');
+  console.log('[TBTrack] 🔐 Attempting to get new token from TBTrack...');
   
   try {
     const response = await fetch(SIGNIN_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: USERNAME, password: PASSWORD }),
+      timeout: 10000, // 10 second timeout
     });
 
     const result = await response.json();
@@ -71,15 +101,23 @@ async function loginAndCacheToken() {
     loginFailureCount = 0;
     
     cachedToken = result.data.token;
+    tokenAcquisitionTime = now;
+    
     const exp = decodeTokenExpiry(cachedToken);
-    tokenExpiresAt = exp || Date.now() + 24 * 60 * 60 * 1000;
+    if (exp) {
+      tokenExpiresAt = exp;
+    } else {
+      // If we can't decode, assume 12 hours validity
+      tokenExpiresAt = now + DEFAULT_TOKEN_VALIDITY_MS;
+      console.log(`[TBTrack] ℹ️ Using default token validity (12 hours)`);
+    }
 
-    console.log('[TBTrack] ✅ Token received and cached successfully');
-    console.log(`[TBTrack] Token expires at: ${new Date(tokenExpiresAt).toLocaleString()}`);
+    console.log(`[TBTrack] ✅ Token acquired successfully`);
+    console.log(`[TBTrack] ⏱️ Token will expire at: ${new Date(tokenExpiresAt).toLocaleString()}`);
 
     return cachedToken;
   } catch (error) {
-    console.error('[TBTrack] 💥 Token request error:', error.message);
+    console.error('[TBTrack] 💥 Token acquisition error:', error.message);
     throw error;
   }
 }

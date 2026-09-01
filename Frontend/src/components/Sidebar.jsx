@@ -92,6 +92,14 @@ const modules = [
     activeIcon: 'bg-white/20 text-white shadow-inner',
   },
   {
+    path: ROUTES.vehicleHistory,
+    moduleKey: 'vehicleHistory',
+    label: 'Vehicle History',
+    icon: RouteIcon,
+    idleIcon: 'bg-gradient-to-br from-indigo-50 to-purple-100 text-indigo-600',
+    activeIcon: 'bg-white/20 text-white shadow-inner',
+  },
+  {
     path: ROUTES.users,
     moduleKey: 'users',
     label: 'User Management',

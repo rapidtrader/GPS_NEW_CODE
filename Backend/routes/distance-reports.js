@@ -35,9 +35,13 @@ router.get('/', authMiddleware, requireModule('distanceReports'), async (req, re
 // POST to fetch fresh distance report from TBTrack and save
 router.post('/sync', authMiddleware, requireModule('distanceReports'), async (req, res) => {
   try {
+    console.log('[DistanceReports API] /sync endpoint called');
     const { startTime, endTime } = req.body;
 
+    console.log(`[DistanceReports API] Request body: startTime=${startTime}, endTime=${endTime}`);
+
     if (!startTime || !endTime) {
+      console.warn('[DistanceReports API] Missing startTime or endTime');
       return res.status(400).json({
         status: 'ERROR',
         message: 'startTime and endTime are required',
@@ -46,9 +50,13 @@ router.post('/sync', authMiddleware, requireModule('distanceReports'), async (re
 
     // Get user's vehicles
     const vehicles = await getVehiclesForUser(req.user);
-    const vehicleNos = vehicles.map((v) => v.vehicleNo).filter(Boolean);
+    const ouids = vehicles.map((v) => v.ouid).filter(Boolean);
 
-    if (vehicleNos.length === 0) {
+    console.log(`[DistanceReports API] Found ${ouids.length} vehicles for user`);
+    console.log(`[DistanceReports API] OUIDs: ${JSON.stringify(ouids)}`);
+
+    if (ouids.length === 0) {
+      console.warn('[DistanceReports API] No vehicles available for user');
       return res.status(400).json({
         status: 'ERROR',
         message: 'No vehicles available',
@@ -56,17 +64,23 @@ router.post('/sync', authMiddleware, requireModule('distanceReports'), async (re
     }
 
     // Get auth token
+    console.log('[DistanceReports API] Getting auth token...');
     const token = await getAuthToken();
 
     // Fetch from TBTrack
+    console.log('[DistanceReports API] Fetching distance report from TBTrack...');
     const reportData = await fetchDistanceReport(token, {
       startTime,
       endTime,
-      ouids: vehicleNos,
+      ouids,
     });
+
+    console.log(`[DistanceReports API] Received ${reportData.length} reports from TBTrack`);
 
     // Save to database
     const savedCount = await saveDistanceReport(reportData, req.user._id);
+
+    console.log(`[DistanceReports API] Saved ${savedCount} reports to database`);
 
     res.json({
       status: 'OK',
@@ -77,6 +91,8 @@ router.post('/sync', authMiddleware, requireModule('distanceReports'), async (re
       saved: true,
     });
   } catch (error) {
+    console.error('[DistanceReports API] Error:', error.message);
+    console.error('[DistanceReports API] Stack:', error.stack);
     const status = error.statusCode || 500;
     res.status(status).json({ status: 'ERROR', message: error.message });
   }

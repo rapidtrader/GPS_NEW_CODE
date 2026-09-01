@@ -1,11 +1,44 @@
 const DistanceReport = require('../models/DistanceReport');
+const Vehicle = require('../models/Vehicle');
 const { fetchWithAuth } = require('./tbtrack');
 
 const DISTANCE_REPORT_URL = process.env.TBTRACK_DISTANCE_REPORT_URL || 'https://tbtrack.in/gps/ajax/v3/report/distance';
 
 async function fetchDistanceReport(token, { startTime, endTime, ouids = [] }) {
   try {
-    const body = { startTime, endTime, ouids };
+    // Get vehicle numbers from our database
+    const Vehicle = require('../models/Vehicle');
+    const vehicles = await Vehicle.find({ ouid: { $in: ouids } }, 'vehicleNo').lean();
+    const vehicleList = vehicles.map(v => v.vehicleNo).filter(Boolean);
+    
+    if (vehicleList.length === 0) {
+      throw new Error('No valid vehicles found');
+    }
+
+    // Format date range: "DD/MM/YYYY HH:MM - DD/MM/YYYY HH:MM"
+    const formatDate = (timestamp) => {
+      const date = new Date(timestamp);
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${day}/${month}/${year} ${hours}:${minutes}`;
+    };
+
+    const dateRange = `${formatDate(startTime)} - ${formatDate(endTime)}`;
+    
+    const body = {
+      vehicleList,
+      dateRange,
+      webRequest: true
+    };
+    
+    console.log('[TBTrack] Fetching distance report with correct format:');
+    console.log(`  - vehicleList: ${JSON.stringify(vehicleList)}`);
+    console.log(`  - dateRange: ${dateRange}`);
+    console.log(`  - webRequest: true`);
+    
     const response = await fetch(DISTANCE_REPORT_URL, {
       method: 'POST',
       headers: {
@@ -15,12 +48,20 @@ async function fetchDistanceReport(token, { startTime, endTime, ouids = [] }) {
       body: JSON.stringify(body),
     });
 
+    console.log(`[TBTrack] Distance report response status: ${response.status}`);
+
     const result = await response.json();
+    
+    console.log(`[TBTrack] Response: ${result.status} - ${result.message}`);
+    
     if (result.status !== 'OK') {
       throw new Error(result.message || 'Failed to fetch distance report');
     }
+    
+    console.log(`[TBTrack] ✅ Distance report fetched: ${(result.data || []).length} records`);
     return result.data || [];
   } catch (error) {
+    console.error('[TBTrack] Distance report fetch error:', error.message);
     throw new Error(`Distance report fetch failed: ${error.message}`);
   }
 }
@@ -34,8 +75,22 @@ async function saveDistanceReport(reportData = [], userId = null) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  // Build a map of vehicleNo -> ouid for quick lookup
+  const vehicleMap = {};
+  try {
+    const vehicles = await Vehicle.find({}, 'vehicleNo ouid').lean();
+    for (const v of vehicles) {
+      if (v.vehicleNo) {
+        vehicleMap[v.vehicleNo] = v.ouid;
+      }
+    }
+  } catch (err) {
+    console.error('[DistanceReportStore] Error loading vehicle map:', err.message);
+  }
+
   for (const record of reportData) {
-    if (!record.Vehicle) continue;
+    const vehicleNo = String(record.Vehicle || '');
+    if (!vehicleNo) continue;
 
     // Extract date fields (format: "31/08/2026")
     const dayWiseData = [];
@@ -58,8 +113,16 @@ async function saveDistanceReport(reportData = [], userId = null) {
       totalDistance = Number(record.TotalDistance) || totalDistance;
     }
 
+    // Lookup OUID from vehicleNo
+    const ouid = vehicleMap[vehicleNo];
+    if (!ouid) {
+      console.warn(`[DistanceReportStore] Could not find OUID for vehicle: ${vehicleNo}`);
+      continue;
+    }
+
     const doc = {
-      vehicleNo: String(record.Vehicle || ''),
+      ouid,
+      vehicleNo,
       vehicleAlias: String(record['Vehicle Alias'] || ''),
       reportDate: today,
       totalDistance,
@@ -71,7 +134,7 @@ async function saveDistanceReport(reportData = [], userId = null) {
 
     ops.push(
       DistanceReport.findOneAndUpdate(
-        { vehicleNo: doc.vehicleNo, reportDate: today },
+        { ouid, reportDate: today },
         { $set: doc },
         { upsert: true, new: true }
       )
@@ -79,8 +142,9 @@ async function saveDistanceReport(reportData = [], userId = null) {
   }
 
   if (ops.length > 0) {
-    await Promise.all(ops);
-    return ops.length;
+    const results = await Promise.all(ops);
+    console.log(`[DistanceReportStore] Saved ${results.length} distance reports`);
+    return results.length;
   }
   return 0;
 }

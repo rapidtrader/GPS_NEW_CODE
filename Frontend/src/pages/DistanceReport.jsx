@@ -52,6 +52,60 @@ function DateField({ label, value, onChange }) {
   );
 }
 
+function DistanceBarChart({ reports, loading }) {
+  // Sort by total distance (descending) and take top 10
+  const sortedReports = useMemo(() => {
+    if (!reports || reports.length === 0) return [];
+    return [...reports]
+      .sort((a, b) => (Number(b.totalDistance) || 0) - (Number(a.totalDistance) || 0))
+      .slice(0, 10);
+  }, [reports]);
+
+  const maxDistance = useMemo(() => {
+    if (sortedReports.length === 0) return 1;
+    return Math.max(...sortedReports.map(r => Number(r.totalDistance) || 0));
+  }, [sortedReports]);
+
+  if (loading || sortedReports.length === 0) return null;
+
+  return (
+    <div className="rounded-2xl bg-black p-4 shadow-sm sm:p-6">
+      <h3 className="mb-4 text-sm font-bold text-white">Total Distance Covered by Each Vehicle in KM</h3>
+      <div className="space-y-3">
+        {sortedReports.map((report, index) => {
+          const distance = Number(report.totalDistance) || 0;
+          const percentage = maxDistance > 0 ? (distance / maxDistance) * 100 : 0;
+          
+          return (
+            <div key={report._id || index} className="flex items-center gap-3">
+              <div className="w-16 flex-shrink-0">
+                <p className="text-xs font-bold text-gray-400">{report.vehicleNo}</p>
+              </div>
+              <div className="flex-1">
+                <div className="relative h-6 overflow-hidden rounded bg-gray-800">
+                  <div
+                    className="h-full rounded transition-all duration-300"
+                    style={{
+                      width: `${percentage}%`,
+                      backgroundColor: percentage > 50 ? '#2E7D32' : '#E65100',
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="w-12 flex-shrink-0 text-right">
+                <p className="text-xs font-bold text-white">{distance.toFixed(0)}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-4 flex justify-center text-xs text-gray-400">
+        Covered
+      </div>
+    </div>
+  );
+}
+
 export default function DistanceReport() {
   const defaults = useMemo(() => todayRange(), []);
   const [fromDate, setFromDate] = useState(defaults.from);
@@ -148,17 +202,6 @@ export default function DistanceReport() {
           </div>
           <div className="flex gap-2">
             <button
-              type="submit"
-              disabled={loading}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold uppercase tracking-wide text-white shadow-sm disabled:opacity-60"
-              style={{ backgroundColor: GREEN }}
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.5 3.5 6 6.5 6 10.5A6 6 0 116 13.5C6 9.5 9.5 6.5 12 3z" />
-              </svg>
-              {loading ? 'Loading...' : 'Apply Filter'}
-            </button>
-            <button
               type="button"
               onClick={syncReports}
               disabled={syncing}
@@ -212,6 +255,9 @@ export default function DistanceReport() {
           </div>
         </div>
 
+        {/* Bar Chart */}
+        <DistanceBarChart reports={reports} loading={loading} />
+
         {loading && reports.length === 0 ? (
           <div className="rounded-2xl bg-white py-12 text-center text-sm text-gray-500 shadow-sm">Loading distance reports...</div>
         ) : reports.length === 0 ? (
@@ -222,25 +268,90 @@ export default function DistanceReport() {
           <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead className="bg-gray-50 text-gray-500">
+                <thead className="bg-purple-900 text-white">
                   <tr>
                     <th className="px-4 py-3 font-semibold">Vehicle</th>
-                    <th className="px-4 py-3 font-semibold">Alias</th>
-                    <th className="px-4 py-3 text-right font-semibold">Total Distance (km)</th>
-                    <th className="px-4 py-3 text-right font-semibold">Last Updated</th>
+                    <th className="px-4 py-3 font-semibold">Vehicle Alias</th>
+                    {/* Dynamic date headers */}
+                    {Array.from(
+                      new Set(
+                        reports.flatMap((r) =>
+                          r.dayWiseData?.map((d) => d.date) || []
+                        )
+                      )
+                    )
+                      .sort()
+                      .map((date) => (
+                        <th key={date} className="px-4 py-3 text-center font-semibold">
+                          {date}
+                        </th>
+                      ))}
+                    <th className="px-4 py-3 text-right font-semibold">Total Distance</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {reports.map((report, i) => (
-                    <tr key={report._id || i} className={i % 2 ? 'bg-gray-50/70' : 'bg-white'}>
-                      <td className="px-4 py-3 font-medium text-gray-900">{report.vehicleNo}</td>
-                      <td className="px-4 py-3 text-gray-600">{report.vehicleAlias || '-'}</td>
-                      <td className="px-4 py-3 text-right font-bold text-gray-900">{report.totalDistance?.toFixed(1) || '0'}</td>
-                      <td className="px-4 py-3 text-right text-xs text-gray-500">
-                        {report.syncedAt ? new Date(report.syncedAt).toLocaleString('en-IN') : '-'}
-                      </td>
-                    </tr>
-                  ))}
+                  {reports.map((report, i) => {
+                    const dates = Array.from(
+                      new Set(
+                        reports.flatMap((r) =>
+                          r.dayWiseData?.map((d) => d.date) || []
+                        )
+                      )
+                    ).sort();
+
+                    return (
+                      <tr
+                        key={report._id || i}
+                        className={`${i % 2 ? 'bg-purple-50' : 'bg-white'} border-b border-gray-200`}
+                      >
+                        <td className="px-4 py-3 font-bold text-gray-900">{report.vehicleNo}</td>
+                        <td className="px-4 py-3 text-gray-600">{report.vehicleAlias || '-'}</td>
+                        {dates.map((date) => {
+                          const dayData = report.dayWiseData?.find((d) => d.date === date);
+                          const distance = dayData?.distance || 0;
+                          return (
+                            <td
+                              key={date}
+                              className="px-4 py-3 text-center font-semibold text-gray-900"
+                            >
+                              {distance}
+                            </td>
+                          );
+                        })}
+                        <td className="px-4 py-3 text-right font-bold text-gray-900">
+                          {report.totalDistance?.toFixed(0) || '0'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {/* Total row */}
+                  <tr className="border-t-2 border-gray-300 bg-purple-900 font-bold text-white">
+                    <td colSpan="2" className="px-4 py-3">
+                      Total
+                    </td>
+                    {Array.from(
+                      new Set(
+                        reports.flatMap((r) =>
+                          r.dayWiseData?.map((d) => d.date) || []
+                        )
+                      )
+                    )
+                      .sort()
+                      .map((date) => {
+                        const dayTotal = reports.reduce((sum, r) => {
+                          const dayData = r.dayWiseData?.find((d) => d.date === date);
+                          return sum + (dayData?.distance || 0);
+                        }, 0);
+                        return (
+                          <td key={date} className="px-4 py-3 text-center">
+                            {dayTotal}
+                          </td>
+                        );
+                      })}
+                    <td className="px-4 py-3 text-right">
+                      {totals.totalDistance.toFixed(0)}
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>

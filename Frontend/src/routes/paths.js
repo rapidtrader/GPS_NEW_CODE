@@ -10,6 +10,7 @@ export const ROUTES = {
   users: '/users',
   sweeperMonitoring: '/sweeper-monitoring',
   distanceReport: '/distance-report',
+  vehicleHistory: '/vehicle-history',
   login: '/login',
   signup: '/signup',
 };
@@ -26,4 +27,5 @@ export const ROUTE_TITLES = {
   [ROUTES.users]: 'User Management',
   [ROUTES.sweeperMonitoring]: 'Sweeper Monitoring',
   [ROUTES.distanceReport]: 'Distance Report',
+  [ROUTES.vehicleHistory]: 'Vehicle History',
 };

@@ -36,6 +36,7 @@ app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/drivers', driverRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/distance-reports', require('./routes/distance-reports'));
+app.use('/api/vehicle-history', require('./routes/vehicle-history'));
 
 async function start() {
   try {

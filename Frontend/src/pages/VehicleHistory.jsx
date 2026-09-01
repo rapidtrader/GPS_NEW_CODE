@@ -152,10 +152,24 @@ function AnimatedRouteMap({ history, playing, onPlayStateChange }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const animationRef = useRef(null);
 
-  const coordinates = useMemo(
-    () => history.filter((h) => h.latitude && h.longitude).map((h) => [h.latitude, h.longitude]),
-    [history]
-  );
+  const coordinates = useMemo(() => {
+    const coords = history
+      .filter((h) => h.latitude && h.longitude)
+      .map((h) => [h.latitude, h.longitude]);
+    
+    // Remove duplicate coordinates (same lat/lng)
+    const seen = new Set();
+    const unique = [];
+    coords.forEach(coord => {
+      const key = `${coord[0].toFixed(6)},${coord[1].toFixed(6)}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(coord);
+      }
+    });
+    
+    return unique.reverse();
+  }, [history]);
 
   const currentPosition = coordinates[currentIndex] || defaultCenter;
 

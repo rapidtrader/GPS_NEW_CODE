@@ -240,6 +240,9 @@ export default function VehicleHistory() {
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState(null);
   const [playing, setPlaying] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const ITEMS_PER_PAGE = 40;
 
   useEffect(() => {
     const loadVehicles = async () => {
@@ -262,6 +265,7 @@ export default function VehicleHistory() {
     setLoading(true);
     setError(null);
     setPlaying(false);
+    setCurrentPage(1); // Reset to first page
     try {
       const params = new URLSearchParams({
         startDate: fromDate,
@@ -383,38 +387,91 @@ export default function VehicleHistory() {
             No route history found for this date range.
           </div>
         ) : (
-          <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-purple-900 text-white">
-                  <tr>
-                    <th className="px-4 py-3 font-semibold">Time</th>
-                    <th className="px-4 py-3 font-semibold">Address</th>
-                    <th className="px-4 py-3 text-right font-semibold">Speed (km/h)</th>
-                    <th className="px-4 py-3 text-right font-semibold">Distance</th>
-                    <th className="px-4 py-3 font-semibold">Status</th>
-                    <th className="px-4 py-3 text-right font-semibold">Fuel</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {history.map((h, i) => (
-                    <tr key={i} className={`${i % 2 ? 'bg-purple-50' : 'bg-white'} border-b border-gray-200`}>
-                      <td className="px-4 py-3 font-medium text-gray-900">
-                        {h.added ? new Date(h.added).toLocaleTimeString('en-IN') : '-'}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 text-xs">
-                        {h.latitude?.toFixed(6)}, {h.longitude?.toFixed(6)}
-                      </td>
-                      <td className="px-4 py-3 text-right text-gray-900">{h.speed?.toFixed(1) || '0'}</td>
-                      <td className="px-4 py-3 text-right text-gray-900">{h.distance?.toFixed(2) || '0'}</td>
-                      <td className="px-4 py-3 text-gray-600">{h.status || '-'}</td>
-                      <td className="px-4 py-3 text-right text-gray-900">{h.fuel?.toFixed(1) || '0'}</td>
+          <>
+            <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-purple-900 text-white">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold">Time</th>
+                      <th className="px-4 py-3 font-semibold">Lat/Long</th>
+                      <th className="px-4 py-3 text-right font-semibold">Speed (km/h)</th>
+                      <th className="px-4 py-3 text-right font-semibold">Distance</th>
+                      <th className="px-4 py-3 font-semibold">Status</th>
+                      <th className="px-4 py-3 text-right font-semibold">Fuel</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {history
+                      .slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
+                      .map((h, i) => (
+                        <tr key={i} className={`${i % 2 ? 'bg-purple-50' : 'bg-white'} border-b border-gray-200`}>
+                          <td className="px-4 py-3 font-medium text-gray-900">
+                            {h.added ? new Date(h.added).toLocaleTimeString('en-IN') : '-'}
+                          </td>
+                          <td className="px-4 py-3 text-gray-600 text-xs">
+                            {h.latitude?.toFixed(6)}, {h.longitude?.toFixed(6)}
+                          </td>
+                          <td className="px-4 py-3 text-right text-gray-900">{h.speed?.toFixed(1) || '0'}</td>
+                          <td className="px-4 py-3 text-right text-gray-900">{h.distance?.toFixed(2) || '0'}</td>
+                          <td className="px-4 py-3 text-gray-600">{h.status || '-'}</td>
+                          <td className="px-4 py-3 text-right text-gray-900">{h.fuel?.toFixed(1) || '0'}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+
+            {/* Pagination */}
+            {history.length > ITEMS_PER_PAGE && (
+              <div className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 shadow-sm">
+                <div className="text-sm text-gray-600">
+                  Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{' '}
+                  {Math.min(currentPage * ITEMS_PER_PAGE, history.length)} of {history.length} records
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    ← Previous
+                  </button>
+                  <div className="flex items-center gap-1">
+                    {Array.from(
+                      { length: Math.ceil(history.length / ITEMS_PER_PAGE) },
+                      (_, i) => i + 1
+                    )
+                      .slice(
+                        Math.max(0, currentPage - 3),
+                        Math.min(Math.ceil(history.length / ITEMS_PER_PAGE), currentPage + 2)
+                      )
+                      .map((page) => (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={`rounded-lg px-2.5 py-1.5 text-sm font-medium ${
+                            currentPage === page
+                              ? 'bg-purple-600 text-white'
+                              : 'border border-gray-200 text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      ))}
+                  </div>
+                  <button
+                    onClick={() => setCurrentPage((p) => p + 1)}
+                    disabled={currentPage >= Math.ceil(history.length / ITEMS_PER_PAGE)}
+                    className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Next →
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

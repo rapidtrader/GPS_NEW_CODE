@@ -1,4 +1,5 @@
 const VehicleHistory = require('../models/VehicleHistory');
+const VehicleRouteHistory = require('../models/VehicleRouteHistory');
 const { getVehiclesForUser } = require('./vehicleStore');
 
 const SPEED_THRESHOLD_KMH = 8;
@@ -27,7 +28,7 @@ function haversineKm(lat1, lon1, lat2, lon2) {
 }
 
 function getPointTime(row) {
-  const t = row.recordedAt || row.createdAt;
+  const t = row.recordedAt || row.added || row.createdAt;
   const ms = t ? new Date(t).getTime() : NaN;
   return Number.isFinite(ms) ? ms : 0;
 }
@@ -212,23 +213,56 @@ async function getSweepingReport(user, { startTime, endTime, ouid = '' }) {
     }
   }
 
-  const query = {
+  // Fetch from both VehicleHistory (old model) and VehicleRouteHistory (new model)
+  const queryOld = {
     recordedAt: { $gte: start, $lte: end },
   };
   if (ouid) {
-    query.ouid = ouid;
+    queryOld.ouid = ouid;
   } else if (user.role !== 'admin') {
-    query.ouid = { $in: [...allowedOuids] };
+    queryOld.ouid = { $in: [...allowedOuids] };
   }
 
-  const history = await VehicleHistory.find(query).sort({ ouid: 1, recordedAt: 1 }).lean();
-  console.log(`[getSweepingReport] Found ${history.length} records in date range`);
+  const queryNew = {
+    added: { $gte: start, $lte: end },
+  };
+  if (ouid) {
+    queryNew.ouid = ouid;
+  } else if (user.role !== 'admin') {
+    queryNew.ouid = { $in: [...allowedOuids] };
+  }
 
+  const [historyOld, historyNew] = await Promise.all([
+    VehicleHistory.find(queryOld).sort({ ouid: 1, recordedAt: 1 }).lean(),
+    VehicleRouteHistory.find(queryNew).sort({ ouid: 1, added: 1 }).lean(),
+  ]);
+
+  console.log(`[getSweepingReport] Found ${historyOld.length} records from VehicleHistory, ${historyNew.length} from VehicleRouteHistory`);
+
+  // Merge both sources - prefer newer VehicleRouteHistory
   const byOuid = new Map();
-  for (const row of history) {
+  
+  // First add old data
+  for (const row of historyOld) {
     if (!row.ouid) continue;
     if (!byOuid.has(row.ouid)) byOuid.set(row.ouid, []);
-    byOuid.get(row.ouid).push(row);
+    byOuid.get(row.ouid).push({ ...row, source: 'old' });
+  }
+
+  // Then add new data (will be used preferentially)
+  for (const row of historyNew) {
+    if (!row.ouid) continue;
+    if (!byOuid.has(row.ouid)) byOuid.set(row.ouid, []);
+    byOuid.get(row.ouid).push({ ...row, source: 'new' });
+  }
+
+  // Sort by time for each vehicle
+  for (const [ouid, records] of byOuid) {
+    records.sort((a, b) => {
+      const timeA = getPointTime(a);
+      const timeB = getPointTime(b);
+      return timeA - timeB;
+    });
   }
 
   const selected = ouid ? vehicleRows.filter((v) => v.ouid === ouid) : vehicleRows;

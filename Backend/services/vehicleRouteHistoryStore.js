@@ -105,8 +105,26 @@ async function saveRouteHistory(routeData = [], vehicleNo, userId = null) {
     const addedDate = parseDate(record.added);
     const receivedDate = parseDate(record.actualRecieved);
 
-    // Use address from TBTrack, or show lat/long
+    // Skip duplicate - same vehicleNo + added timestamp + syncedBy
+    if (addedDate) {
+      const existing = await VehicleRouteHistory.findOne({ vehicleNo, added: addedDate, syncedBy: userId }).lean();
+      if (existing) continue;
+    }
+
+    // Fetch address from TBTrack using refk
     let address = record.address;
+    if ((!address || address === 'Not found') && record.refk) {
+      try {
+        const { getAuthToken } = require('./tbtrack');
+        const token = await getAuthToken();
+        const r = await fetch(`https://tbtrack.in/gps/rest/v4/tpr/fetch/refk/address?refk=${record.refk}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const d = await r.json();
+        if (d.status === 'OK' && d.data) address = d.data;
+      } catch (_) {}
+    }
+    // Fallback to lat/long
     if (!address || address === 'Not found') {
       address = `${record.latitude?.toFixed(4) || '0'}, ${record.longitude?.toFixed(4) || '0'}`;
     }
@@ -139,6 +157,7 @@ async function saveRouteHistory(routeData = [], vehicleNo, userId = null) {
     console.log(`[RouteHistoryStore] Saved ${ops.length} route history records for ${vehicleNo}`);
     return ops.length;
   }
+  console.log(`[RouteHistoryStore] All records duplicate, skipped for ${vehicleNo}`);
   return 0;
 }
 

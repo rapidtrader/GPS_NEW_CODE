@@ -17,7 +17,7 @@ function parseLocation(pLoc) {
 
 function haversineKm(lat1, lon1, lat2, lon2) {
   if (![lat1, lon1, lat2, lon2].every((n) => Number.isFinite(Number(n)))) return 0;
-  const R = 6371;
+  const R = 6371; // Earth radius in km
   const toRad = (d) => (Number(d) * Math.PI) / 180;
   const dLat = toRad(lat2 - lat1);
   const dLon = toRad(lon2 - lon1);
@@ -34,11 +34,14 @@ function getPointTime(row) {
 }
 
 function getSpeed(row) {
-  const v = row.rawData || {};
-  const meta = v.terminalPacketMeta || {};
-  
   // Try to get speed from various fields
-  let speed = Number(row.speed ?? v.mileage ?? meta.speed ?? meta.pSpeed ?? 0);
+  let speed = row.speed;
+  
+  if (!(speed > 0)) {
+    const v = row.rawData || {};
+    const meta = v.terminalPacketMeta || {};
+    speed = Number(v.mileage ?? meta.speed ?? meta.pSpeed ?? 0);
+  }
   
   // If speed is 0 or not available, check if odometer is changing
   // This indicates vehicle is moving even if speed isn't reported
@@ -59,6 +62,7 @@ function getCoords(row) {
 }
 
 function getOdometer(row) {
+  // For cumulative tracking (VehicleHistory uses this)
   const n = Number(row.odometer ?? row.rawData?.odometer);
   return Number.isFinite(n) ? n : null;
 }
@@ -70,6 +74,12 @@ function modeOf(speed) {
 
 function roundKm(value) {
   return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+function getDateKey(timestamp) {
+  // Return date in YYYY-MM-DD format
+  const date = new Date(timestamp);
+  return date.toISOString().split('T')[0];
 }
 
 function emptyBucket() {
@@ -116,7 +126,6 @@ function segmentize(points) {
 
     const speed = getSpeed(point);
     const mode = modeOf(speed);
-    const odo = getOdometer(point);
     const { lat, lng } = getCoords(point);
 
     if (mode === 'idle') {
@@ -125,33 +134,52 @@ function segmentize(points) {
     }
 
     if (!current) {
-      current = { mode, startTime: t, endTime: t, km: 0, lastOdo: odo, lastLat: lat, lastLng: lng };
+      // Track odometer for fallback
+      current = { 
+        mode, 
+        startTime: t, 
+        endTime: t, 
+        km: 0, 
+        lastOdo: getOdometer(point),
+        lastLat: lat, 
+        lastLng: lng 
+      };
       continue;
     }
 
     const gap = t - current.endTime;
     if (gap > MAX_GAP_MS || mode !== current.mode) {
       close();
-      current = { mode, startTime: t, endTime: t, km: 0, lastOdo: odo, lastLat: lat, lastLng: lng };
+      current = { 
+        mode, 
+        startTime: t, 
+        endTime: t, 
+        km: 0, 
+        lastOdo: getOdometer(point),
+        lastLat: lat, 
+        lastLng: lng 
+      };
       continue;
     }
 
     let dKm = 0;
-    if (odo != null && current.lastOdo != null && odo >= current.lastOdo) {
-      // Use odometer difference (more reliable than GPS haversine)
-      dKm = odo - current.lastOdo;
-    } else if (odo != null && current.lastOdo != null) {
-      // Odometer reset or invalid - don't use haversine, skip this point
-      console.warn(`[sweepingStore] Odometer reset detected: ${current.lastOdo} -> ${odo} for vehicle ${current.vehicleNo}`);
-      dKm = 0;
-    } else {
-      // No odometer data - don't use haversine as it gives incorrect results with static GPS
-      dKm = 0;
+    
+    // Use GPS coordinates to calculate distance (most reliable)
+    if (Number.isFinite(lat) && Number.isFinite(lng) && 
+        Number.isFinite(current.lastLat) && Number.isFinite(current.lastLng)) {
+      dKm = haversineKm(current.lastLat, current.lastLng, lat, lng);
+    }
+    // Fallback to odometer if available
+    else {
+      const odo = getOdometer(point);
+      if (odo != null && current.lastOdo != null && odo >= current.lastOdo) {
+        dKm = odo - current.lastOdo;
+      }
     }
 
     current.endTime = t;
     current.km += dKm;
-    current.lastOdo = odo != null ? odo : current.lastOdo;
+    current.lastOdo = getOdometer(point);
     if (Number.isFinite(lat) && Number.isFinite(lng)) {
       current.lastLat = lat;
       current.lastLng = lng;
@@ -274,6 +302,31 @@ async function getSweepingReport(user, { startTime, endTime, ouid = '' }) {
     const lastPointTime = points.length ? getPointTime(points[points.length - 1]) : 0;
     if (lastPointTime > lastUpdateMs) lastUpdateMs = lastPointTime;
 
+    // Group by date for date-wise breakdown
+    const dateWiseMap = new Map();
+    for (const point of points) {
+      const t = getPointTime(point);
+      if (!t) continue;
+      
+      const dateKey = getDateKey(t);
+      if (!dateWiseMap.has(dateKey)) {
+        dateWiseMap.set(dateKey, []);
+      }
+      dateWiseMap.get(dateKey).push(point);
+    }
+
+    // Calculate per-date stats
+    const dateWiseStats = Array.from(dateWiseMap.entries())
+      .map(([dateKey, datePoints]) => {
+        const dateBuckets = segmentize(datePoints);
+        return {
+          date: dateKey,
+          sweeping: dateBuckets.sweeping,
+          nonSweeping: dateBuckets.nonSweeping,
+        };
+      })
+      .sort((a, b) => b.date.localeCompare(a.date)); // Sort descending (latest first)
+
     return {
       ouid: vehicle.ouid,
       vehicleNo: vehicle.vehicleNo || vehicle.ouid,
@@ -285,6 +338,7 @@ async function getSweepingReport(user, { startTime, endTime, ouid = '' }) {
       lastUpdateAt: lastPointTime || null,
       sweeping: buckets.sweeping,
       nonSweeping: buckets.nonSweeping,
+      dateWiseStats,
     };
   });
 

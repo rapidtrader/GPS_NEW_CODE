@@ -191,31 +191,80 @@ function SegmentSheet({ detail, onClose }) {
           {segments.length === 0 ? (
             <p className="py-10 text-center text-sm text-gray-500">No GPS segments in this range.</p>
           ) : (
-            <div className="overflow-hidden rounded-xl border border-gray-200">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-gray-50 text-gray-500">
-                  <tr>
-                    <th className="px-3 py-2 font-semibold">Start time</th>
-                    <th className="px-3 py-2 font-semibold">End time</th>
-                    <th className="px-3 py-2 text-right font-semibold">Total km</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {segments.map((seg, i) => (
-                    <tr key={`${seg.startTime}-${i}`} className={i % 2 ? 'bg-gray-50/70' : 'bg-white'}>
-                      <td className="px-3 py-2.5 text-gray-800">
-                        <div className="font-medium">{formatClock(seg.startTime)}</div>
-                        <div className="text-[0.65rem] text-gray-400">{formatDateTime(seg.startTime).slice(0, 11)}</div>
-                      </td>
-                      <td className="px-3 py-2.5 text-gray-800">
-                        <div className="font-medium">{formatClock(seg.endTime)}</div>
-                        <div className="text-[0.65rem] text-gray-400">{formatDateTime(seg.endTime).slice(0, 11)}</div>
-                      </td>
-                      <td className="px-3 py-2.5 text-right font-bold text-gray-900">{formatKm(seg.totalKm)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div>
+              {/* Overall stats */}
+              <div className="mb-4 rounded-lg border p-3" style={{ borderColor: accent, backgroundColor: `${accent}08` }}>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs text-gray-500">Total Time</p>
+                    <p className="text-lg font-bold" style={{ color: accent }}>{formatDuration(detail.stats?.totalTimeSec)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Total Distance</p>
+                    <p className="text-lg font-bold" style={{ color: accent }}>{formatKm(detail.stats?.totalKm)} km</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Date-wise breakdown */}
+              {detail.dateWiseStats && detail.dateWiseStats.length > 0 && (
+                <div className="overflow-hidden rounded-xl border border-gray-200">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-gray-50 text-gray-500">
+                      <tr>
+                        <th className="px-3 py-2 font-semibold">Date</th>
+                        <th className="px-3 py-2 text-right font-semibold">Time</th>
+                        <th className="px-3 py-2 text-right font-semibold">Distance</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detail.dateWiseStats.map((d, i) => {
+                        const modeData = isSweep ? d.sweeping : d.nonSweeping;
+                        return (
+                          <tr key={`${d.date}-${i}`} className={i % 2 ? 'bg-gray-50/70' : 'bg-white'}>
+                            <td className="px-3 py-2.5 font-medium text-gray-800">{d.date}</td>
+                            <td className="px-3 py-2.5 text-right text-gray-800">{formatDuration(modeData?.totalTimeSec)}</td>
+                            <td className="px-3 py-2.5 text-right font-bold text-gray-900">{formatKm(modeData?.totalKm)} km</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Original segments view */}
+              {segments.length > 0 && (
+                <div className="mt-4">
+                  <p className="mb-3 text-xs font-semibold text-gray-600">{segments.length} Segments</p>
+                  <div className="overflow-hidden rounded-xl border border-gray-200">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-gray-50 text-gray-500">
+                        <tr>
+                          <th className="px-3 py-2 font-semibold">Start time</th>
+                          <th className="px-3 py-2 font-semibold">End time</th>
+                          <th className="px-3 py-2 text-right font-semibold">Total km</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {segments.map((seg, i) => (
+                          <tr key={`${seg.startTime}-${i}`} className={i % 2 ? 'bg-gray-50/70' : 'bg-white'}>
+                            <td className="px-3 py-2.5 text-gray-800">
+                              <div className="font-medium">{formatClock(seg.startTime)}</div>
+                              <div className="text-[0.65rem] text-gray-400">{formatDateTime(seg.startTime).slice(0, 11)}</div>
+                            </td>
+                            <td className="px-3 py-2.5 text-gray-800">
+                              <div className="font-medium">{formatClock(seg.endTime)}</div>
+                              <div className="text-[0.65rem] text-gray-400">{formatDateTime(seg.endTime).slice(0, 11)}</div>
+                            </td>
+                            <td className="px-3 py-2.5 text-right font-bold text-gray-900">{formatKm(seg.totalKm)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -405,12 +454,12 @@ export default function SweeperMonitoring() {
                   <ModePanel
                     mode="sweeping"
                     stats={v.sweeping}
-                    onViewDetails={() => setDetail({ vehicle: v, mode: 'sweeping', stats: v.sweeping })}
+                    onViewDetails={() => setDetail({ vehicle: v, mode: 'sweeping', stats: v.sweeping, dateWiseStats: v.dateWiseStats })}
                   />
                   <ModePanel
                     mode="nonSweeping"
                     stats={v.nonSweeping}
-                    onViewDetails={() => setDetail({ vehicle: v, mode: 'nonSweeping', stats: v.nonSweeping })}
+                    onViewDetails={() => setDetail({ vehicle: v, mode: 'nonSweeping', stats: v.nonSweeping, dateWiseStats: v.dateWiseStats })}
                   />
                 </div>
               </article>

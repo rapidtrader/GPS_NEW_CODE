@@ -243,6 +243,7 @@ function SegmentSheet({ detail, onClose }) {
                         <tr>
                           <th className="px-3 py-2 font-semibold">Start time</th>
                           <th className="px-3 py-2 font-semibold">End time</th>
+                          <th className="px-3 py-2 text-right font-semibold">Speed (km/h)</th>
                           <th className="px-3 py-2 text-right font-semibold">Total km</th>
                         </tr>
                       </thead>
@@ -257,6 +258,7 @@ function SegmentSheet({ detail, onClose }) {
                               <div className="font-medium">{formatClock(seg.endTime)}</div>
                               <div className="text-[0.65rem] text-gray-400">{formatDateTime(seg.endTime).slice(0, 11)}</div>
                             </td>
+                            <td className="px-3 py-2.5 text-right text-gray-900">{seg.avgSpeed?.toFixed(1) || '-'}</td>
                             <td className="px-3 py-2.5 text-right font-bold text-gray-900">{formatKm(seg.totalKm)}</td>
                           </tr>
                         ))}

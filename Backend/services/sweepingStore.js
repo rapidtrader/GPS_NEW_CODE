@@ -88,11 +88,14 @@ function emptyBucket() {
 
 function finalizeSegment(seg) {
   const durationSec = Math.max(0, Math.round((seg.endTime - seg.startTime) / 1000));
+  const totalKm = roundKm(seg.km);
+  const avgSpeed = durationSec > 0 ? (totalKm * 3600) / durationSec : 0; // km/h
   return {
     startTime: seg.startTime,
     endTime: seg.endTime,
-    totalKm: roundKm(seg.km),
+    totalKm,
     durationSec,
+    avgSpeed: roundKm(avgSpeed),
   };
 }
 

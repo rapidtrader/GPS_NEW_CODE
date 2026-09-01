@@ -278,7 +278,7 @@ export default function SweeperMonitoring() {
   const [fromDate, setFromDate] = useState(defaults.from);
   const [toDate, setToDate] = useState(defaults.to);
   const [vehicleOuid, setVehicleOuid] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('sweeper');
   const [options, setOptions] = useState([]);
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);

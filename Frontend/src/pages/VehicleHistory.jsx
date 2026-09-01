@@ -472,7 +472,6 @@ export default function VehicleHistory() {
                     <tr>
                       <th className="px-4 py-3 font-semibold">Time</th>
                       <th className="px-4 py-3 font-semibold">Lat/Long</th>
-                      <th className="px-4 py-3 font-semibold">Address</th>
                       <th className="px-4 py-3 text-right font-semibold">Speed (km/h)</th>
                       <th className="px-4 py-3 text-right font-semibold">Distance</th>
                       <th className="px-4 py-3 font-semibold">Status</th>
@@ -490,10 +489,6 @@ export default function VehicleHistory() {
                           <td className="px-4 py-3 text-gray-600 text-xs">
                             {h.latitude?.toFixed(6)}, {h.longitude?.toFixed(6)}
                           </td>
-                          <AddressCell 
-                            lat={h.latitude} 
-                            lng={h.longitude} 
-                          />
                           <td className="px-4 py-3 text-right text-gray-900">{h.speed?.toFixed(1) || '0'}</td>
                           <td className="px-4 py-3 text-right text-gray-900">{h.distance?.toFixed(2) || '0'}</td>
                           <td className="px-4 py-3 text-gray-600">{h.status || '-'}</td>

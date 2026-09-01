@@ -38,51 +38,6 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/distance-reports', require('./routes/distance-reports'));
 app.use('/api/vehicle-history', require('./routes/vehicle-history'));
 
-// Geocoding proxy - cached, no CORS issues, no auth needed
-const geocodeCache = new Map();
-
-app.get('/api/geocode', async (req, res) => {
-  const { lat, lng } = req.query;
-  if (!lat || !lng) return res.status(400).json({ status: 'ERROR', message: 'lat and lng required' });
-
-  const key = `${parseFloat(lat).toFixed(5)},${parseFloat(lng).toFixed(5)}`;
-
-  // Return from cache
-  if (geocodeCache.has(key)) {
-    return res.json({ status: 'OK', address: geocodeCache.get(key), cached: true });
-  }
-
-  try {
-    // Use Photon API (free, no rate limit, CORS friendly alternative to Nominatim)
-    const response = await fetch(
-      `https://photon.komoot.io/reverse?lon=${lng}&lat=${lat}`,
-      {
-        headers: {
-          'Accept': 'application/json',
-        }
-      }
-    );
-    const data = await response.json();
-    const props = data.features?.[0]?.properties || {};
-    
-    const parts = [
-      props.street,
-      props.suburb || props.district,
-      props.city || props.town || props.village,
-      props.state,
-    ].filter(Boolean);
-
-    const address = parts.length
-      ? parts.join(', ')
-      : `${parseFloat(lat).toFixed(4)}, ${parseFloat(lng).toFixed(4)}`;
-
-    geocodeCache.set(key, address);
-    res.json({ status: 'OK', address });
-  } catch (err) {
-    console.error('[Geocode] Error:', err.message);
-    res.json({ status: 'OK', address: key });
-  }
-});
 
 async function start() {
   try {

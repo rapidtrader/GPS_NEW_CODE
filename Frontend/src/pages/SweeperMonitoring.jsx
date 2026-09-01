@@ -201,7 +201,7 @@ function SegmentSheet({ detail, onClose }) {
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Total Distance</p>
-                    <p className="text-lg font-bold" style={{ color: accent }}>{formatKm(detail.stats?.totalKm)} km</p>
+                    <p className="text-lg font-bold" style={{ color: accent }}>{formatKm(detail.stats?.totalKm)}</p>
                   </div>
                 </div>
               </div>
@@ -224,7 +224,7 @@ function SegmentSheet({ detail, onClose }) {
                           <tr key={`${d.date}-${i}`} className={i % 2 ? 'bg-gray-50/70' : 'bg-white'}>
                             <td className="px-3 py-2.5 font-medium text-gray-800">{d.date}</td>
                             <td className="px-3 py-2.5 text-right text-gray-800">{formatDuration(modeData?.totalTimeSec)}</td>
-                            <td className="px-3 py-2.5 text-right font-bold text-gray-900">{formatKm(modeData?.totalKm)} km</td>
+                            <td className="px-3 py-2.5 text-right font-bold text-gray-900">{formatKm(modeData?.totalKm)}</td>
                           </tr>
                         );
                       })}

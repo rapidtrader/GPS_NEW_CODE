@@ -236,7 +236,9 @@ function SegmentSheet({ detail, onClose }) {
               {/* Original segments view */}
               {segments.length > 0 && (
                 <div className="mt-4">
-                  <p className="mb-3 text-xs font-semibold text-gray-600">{segments.length} Segments</p>
+                  <p className="mb-3 text-xs font-semibold text-gray-600">
+                    {segments.filter(seg => isSweep ? seg.avgSpeed < 8 : seg.avgSpeed > 8).length} Segments
+                  </p>
                   <div className="overflow-hidden rounded-xl border border-gray-200">
                     <table className="w-full text-left text-xs">
                       <thead className="bg-gray-50 text-gray-500">
@@ -248,7 +250,9 @@ function SegmentSheet({ detail, onClose }) {
                         </tr>
                       </thead>
                       <tbody>
-                        {segments.map((seg, i) => (
+                        {segments
+                          .filter(seg => isSweep ? seg.avgSpeed < 8 : seg.avgSpeed > 8)
+                          .map((seg, i) => (
                           <tr key={`${seg.startTime}-${i}`} className={i % 2 ? 'bg-gray-50/70' : 'bg-white'}>
                             <td className="px-3 py-2.5 text-gray-800">
                               <div className="font-medium">{formatClock(seg.startTime)}</div>

@@ -37,6 +37,76 @@ function CalendarIcon({ className = 'h-4 w-4' }) {
   );
 }
 
+// Throttled geocoding queue - backend proxy se fetch karo
+const geocodeCache = new Map();
+const geocodeQueue = [];
+let geocodeTimer = null;
+
+function processGeocodeQueue() {
+  if (geocodeQueue.length === 0) {
+    geocodeTimer = null;
+    return;
+  }
+  const { lat, lng, resolve } = geocodeQueue.shift();
+  const key = `${lat.toFixed(5)},${lng.toFixed(5)}`;
+
+  if (geocodeCache.has(key)) {
+    resolve(geocodeCache.get(key));
+    geocodeTimer = setTimeout(processGeocodeQueue, 50);
+    return;
+  }
+
+  fetch(`/api/geocode?lat=${lat}&lng=${lng}`)
+    .then(r => r.json())
+    .then(data => {
+      const address = data.address || key;
+      geocodeCache.set(key, address);
+      resolve(address);
+    })
+    .catch(() => {
+      geocodeCache.set(key, key);
+      resolve(key);
+    })
+    .finally(() => {
+      geocodeTimer = setTimeout(processGeocodeQueue, 300); // 300ms between requests
+    });
+}
+
+function reverseGeocode(lat, lng) {
+  const key = `${lat.toFixed(5)},${lng.toFixed(5)}`;
+  if (geocodeCache.has(key)) {
+    return Promise.resolve(geocodeCache.get(key));
+  }
+  return new Promise(resolve => {
+    geocodeQueue.push({ lat, lng, resolve });
+    if (!geocodeTimer) {
+      geocodeTimer = setTimeout(processGeocodeQueue, 0);
+    }
+  });
+}
+
+function AddressCell({ lat, lng }) {
+  const [address, setAddress] = useState(null);
+
+  useEffect(() => {
+    if (!lat || !lng) {
+      setAddress('N/A');
+      return;
+    }
+    let cancelled = false;
+    reverseGeocode(lat, lng).then(addr => {
+      if (!cancelled) setAddress(addr);
+    });
+    return () => { cancelled = true; };
+  }, [lat, lng]);
+
+  return (
+    <td className="px-4 py-3 text-gray-600 text-sm max-w-xs truncate" title={address || ''}>
+      {address ?? <span className="text-gray-400 text-xs">Loading...</span>}
+    </td>
+  );
+}
+
 function DateField({ label, value, onChange }) {
   return (
     <label className="block min-w-0 flex-1">
@@ -241,8 +311,15 @@ export default function VehicleHistory() {
   const [error, setError] = useState(null);
   const [playing, setPlaying] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [addressCache, setAddressCache] = useState({});
 
   const ITEMS_PER_PAGE = 40;
+
+  // Cache updater (for AddressCell to update cache)
+  const fetchAddress = useCallback((lat, lng, address) => {
+    const key = `${lat?.toFixed(6)},${lng?.toFixed(6)}`;
+    setAddressCache(prev => ({ ...prev, [key]: address }));
+  }, []);
 
   useEffect(() => {
     const loadVehicles = async () => {
@@ -395,6 +472,7 @@ export default function VehicleHistory() {
                     <tr>
                       <th className="px-4 py-3 font-semibold">Time</th>
                       <th className="px-4 py-3 font-semibold">Lat/Long</th>
+                      <th className="px-4 py-3 font-semibold">Address</th>
                       <th className="px-4 py-3 text-right font-semibold">Speed (km/h)</th>
                       <th className="px-4 py-3 text-right font-semibold">Distance</th>
                       <th className="px-4 py-3 font-semibold">Status</th>
@@ -412,6 +490,10 @@ export default function VehicleHistory() {
                           <td className="px-4 py-3 text-gray-600 text-xs">
                             {h.latitude?.toFixed(6)}, {h.longitude?.toFixed(6)}
                           </td>
+                          <AddressCell 
+                            lat={h.latitude} 
+                            lng={h.longitude} 
+                          />
                           <td className="px-4 py-3 text-right text-gray-900">{h.speed?.toFixed(1) || '0'}</td>
                           <td className="px-4 py-3 text-right text-gray-900">{h.distance?.toFixed(2) || '0'}</td>
                           <td className="px-4 py-3 text-gray-600">{h.status || '-'}</td>

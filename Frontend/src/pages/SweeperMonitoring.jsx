@@ -278,11 +278,19 @@ export default function SweeperMonitoring() {
   const [fromDate, setFromDate] = useState(defaults.from);
   const [toDate, setToDate] = useState(defaults.to);
   const [vehicleOuid, setVehicleOuid] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
   const [options, setOptions] = useState([]);
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [detail, setDetail] = useState(null);
+
+  // Define categories with their vehicles
+  const categories = {
+    sweeper: { name: 'Sweeper', vehicles: ['1CBM', '2CBM', '3CBM'] },
+    litterPicker: { name: 'Litter Picker', vehicles: ['LP1', 'LP2', 'LP3'] },
+    jetWasher: { name: 'Jet Washer', vehicles: ['JW1', 'JW2'] },
+  };
 
   const loadOptions = useCallback(async () => {
     try {
@@ -306,7 +314,13 @@ export default function SweeperMonitoring() {
       if (!startTime || !endTime || startTime > endTime) {
         throw new Error('Please choose a valid date range');
       }
+      
+      console.log(`[SweeperMonitoring] Loading report - category: ${selectedCategory}, vehicleOuid: ${vehicleOuid}`);
+      
+      // If specific vehicle is selected, use its ouid
+      // If only category is selected (no specific vehicle), pass empty ouid (will show all in category)
       const result = await fetchSweepingReport({ startTime, endTime, ouid: vehicleOuid });
+      console.log(`[SweeperMonitoring] Report received:`, result.data);
       setReport(result.data);
     } catch (err) {
       setError(err.message);
@@ -340,26 +354,66 @@ export default function SweeperMonitoring() {
             <DateField label="From Date" value={fromDate} onChange={setFromDate} />
             <DateField label="To Date" value={toDate} onChange={setToDate} />
           </div>
-          <label className="mb-3 block">
-            <span className="mb-1.5 block text-[0.7rem] font-medium text-gray-500">Vehicle</span>
-            <div className="relative">
-              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                <TruckMiniIcon className="h-4 w-4" />
+          
+          {/* Category and Vehicle Dropdowns */}
+          <div className="mb-3 grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="mb-1.5 block text-[0.7rem] font-medium text-gray-500">Category</span>
+              <div className="relative">
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => {
+                    setSelectedCategory(e.target.value);
+                    setVehicleOuid('');
+                  }}
+                  className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-3 pr-8 text-sm font-medium text-gray-900 outline-none focus:border-green-500 focus:bg-white focus:ring-2 focus:ring-green-100"
+                >
+                  <option value="">All Vehicles</option>
+                  {Object.entries(categories).map(([key, cat]) => (
+                    <option key={key} value={key}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+                <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                  </svg>
+                </span>
+              </div>
+            </label>
+
+            <label className="block">
+              <span className="mb-1.5 block text-[0.7rem] font-medium text-gray-500">
+                {selectedCategory ? `${categories[selectedCategory]?.name}` : 'Vehicle'}
               </span>
-              <select
-                value={vehicleOuid}
-                onChange={(e) => setVehicleOuid(e.target.value)}
-                className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-8 text-sm font-medium text-gray-900 outline-none focus:border-green-500 focus:bg-white focus:ring-2 focus:ring-green-100"
-              >
-                <option value="">All Vehicles</option>
-                {options.map((v) => (
-                  <option key={v.ouid} value={v.ouid}>
-                    {v.vehicleNo}{v.alias ? ` · ${v.alias}` : ''}
+              <div className="relative">
+                <select
+                  value={vehicleOuid}
+                  onChange={(e) => setVehicleOuid(e.target.value)}
+                  className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-3 pr-8 text-sm font-medium text-gray-900 outline-none focus:border-green-500 focus:bg-white focus:ring-2 focus:ring-green-100"
+                >
+                  <option value="">
+                    All {selectedCategory ? categories[selectedCategory]?.name : 'Select Category First'}
                   </option>
-                ))}
-              </select>
-            </div>
-          </label>
+                  {selectedCategory &&
+                    options
+                      .filter((v) => categories[selectedCategory].vehicles.includes(v.vehicleNo))
+                      .map((v) => (
+                        <option key={v.ouid} value={v.ouid}>
+                          {v.vehicleNo}{v.alias ? ` · ${v.alias}` : ''}
+                        </option>
+                      ))}
+                </select>
+                <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                  </svg>
+                </span>
+              </div>
+            </label>
+          </div>
+
           <button
             type="submit"
             disabled={loading}
@@ -409,7 +463,11 @@ export default function SweeperMonitoring() {
         </div>
 
         <div className="flex items-center justify-between px-1">
-          <p className="text-sm font-semibold text-gray-800">{vehicles.length} Vehicles</p>
+          <p className="text-sm font-semibold text-gray-800">
+            {selectedCategory && !vehicleOuid
+              ? `${categories[selectedCategory]?.name} (${vehicles.filter(v => categories[selectedCategory]?.vehicles.includes(v.vehicleNo)).length}/${vehicles.length})`
+              : `${vehicles.length} Vehicles`}
+          </p>
           <button type="button" onClick={loadReport} className="inline-flex items-center gap-1 text-xs text-gray-500">
             Last update: {report?.lastUpdate || '--'}
             <svg className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -426,7 +484,15 @@ export default function SweeperMonitoring() {
               No vehicles found. Open Live Vehicles so GPS history can sync.
             </div>
           ) : (
-            vehicles.map((v, index) => (
+            vehicles
+              .filter(v => {
+                // If category selected but no specific vehicle, filter by category
+                if (selectedCategory && !vehicleOuid) {
+                  return categories[selectedCategory]?.vehicles.includes(v.vehicleNo);
+                }
+                return true;
+              })
+              .map((v, index) => (
               <article key={v.ouid} className="rounded-2xl bg-white p-4 shadow-sm">
                 <div className="mb-3 flex items-start justify-between gap-3">
                   <div className="min-w-0">

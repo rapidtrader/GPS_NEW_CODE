@@ -217,7 +217,7 @@ async function getSweepingReport(user, { startTime, endTime, ouid = '' }) {
     throw err;
   }
 
-  console.log(`[getSweepingReport] Date range: ${start.toISOString()} to ${end.toISOString()}`);
+  console.log(`[getSweepingReport] Date range: ${start.toISOString()} to ${end.toISOString()}, ouid: "${ouid}"`);
 
   const liveVehicles = await getVehiclesForUser(user);
   const vehicleRows = liveVehicles.map((raw) => ({

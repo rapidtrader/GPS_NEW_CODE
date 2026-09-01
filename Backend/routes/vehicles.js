@@ -57,7 +57,7 @@ router.get('/sweeping', authMiddleware, requireModule('sweeperMonitoring'), asyn
   try {
     const startTime = Number(req.query.startTime);
     const endTime = Number(req.query.endTime);
-    const ouid = req.query.ouid || '';
+    const ouid = (req.query.ouid || '').trim();
 
     if (!startTime || !endTime) {
       return res.status(400).json({

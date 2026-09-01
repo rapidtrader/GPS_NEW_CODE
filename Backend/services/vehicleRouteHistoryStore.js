@@ -76,14 +76,16 @@ async function saveRouteHistory(routeData = [], vehicleNo, userId = null) {
   const parseDate = (dateStr) => {
     if (!dateStr) return null;
     try {
-      // Format: "DD/MM/YYYY HH:MM:SS" or "DD/MM/YYYY HH:MM"
+      // Format: "DD/MM/YYYY HH:MM:SS" or "DD/MM/YYYY HH:MM" (IST timezone)
       const parts = dateStr.split(' ');
       if (parts.length < 2) return null;
 
       const [day, month, year] = parts[0].split('/');
       const [hours, minutes, seconds = '0'] = parts[1].split(':');
 
-      const date = new Date(
+      // Create date in local timezone (which is IST on server)
+      // Then convert to UTC for storage
+      const localDate = new Date(
         parseInt(year),
         parseInt(month) - 1,
         parseInt(day),
@@ -92,7 +94,11 @@ async function saveRouteHistory(routeData = [], vehicleNo, userId = null) {
         parseInt(seconds)
       );
 
-      return isNaN(date.getTime()) ? null : date;
+      // Assuming the time from TBTrack is in IST (UTC+5:30)
+      // Subtract 5:30 hours to get UTC
+      const utcDate = new Date(localDate.getTime() - (5.5 * 60 * 60 * 1000));
+
+      return isNaN(utcDate.getTime()) ? null : utcDate;
     } catch (err) {
       console.warn(`[RouteHistoryStore] Could not parse date: ${dateStr}`);
       return null;

@@ -37,17 +37,16 @@ function rangeToTimestamp(from, to) {
   return { startTime: start.getTime(), endTime: end.getTime() };
 }
 
-// Convert UTC date to IST (UTC+5:30) and format as HH:MM:SS
+// Format date to IST time string
 function formatTimeIST(date) {
   if (!date) return '-';
   const d = new Date(date);
-  // IST is UTC+5:30
-  const istTime = new Date(d.getTime() + (5.5 * 60 * 60 * 1000));
-  return istTime.toLocaleTimeString('en-IN', { 
+  return d.toLocaleTimeString('en-IN', { 
     hour: '2-digit', 
     minute: '2-digit', 
     second: '2-digit',
-    hour12: true
+    hour12: true,
+    timeZone: 'Asia/Kolkata'
   });
 }
 

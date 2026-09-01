@@ -29,6 +29,20 @@ function rangeToTimestamp(from, to) {
   return { startTime: start.getTime(), endTime: end.getTime() };
 }
 
+// Convert UTC date to IST (UTC+5:30) and format as HH:MM:SS
+function formatTimeIST(date) {
+  if (!date) return '-';
+  const d = new Date(date);
+  // IST is UTC+5:30
+  const istTime = new Date(d.getTime() + (5.5 * 60 * 60 * 1000));
+  return istTime.toLocaleTimeString('en-IN', { 
+    hour: '2-digit', 
+    minute: '2-digit', 
+    second: '2-digit',
+    hour12: true
+  });
+}
+
 function CalendarIcon({ className = 'h-4 w-4' }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
@@ -287,7 +301,7 @@ function AnimatedRouteMap({ history, playing, onPlayStateChange }) {
                   <>
                     <p>Lat/Long: {history[currentIndex].latitude?.toFixed(6)}, {history[currentIndex].longitude?.toFixed(6)}</p>
                     <p>Speed: {history[currentIndex].speed} km/h</p>
-                    <p>Time: {new Date(history[currentIndex].added).toLocaleTimeString('en-IN')}</p>
+                    <p>Time: {formatTimeIST(history[currentIndex].added)}</p>
                   </>
                 )}
               </div>
@@ -484,7 +498,7 @@ export default function VehicleHistory() {
                       .map((h, i) => (
                         <tr key={i} className={`${i % 2 ? 'bg-purple-50' : 'bg-white'} border-b border-gray-200`}>
                           <td className="px-4 py-3 font-medium text-gray-900">
-                            {h.added ? new Date(h.added).toLocaleTimeString('en-IN') : '-'}
+                            {formatTimeIST(h.added)}
                           </td>
                           <td className="px-4 py-3 text-gray-600 text-xs">
                             {h.latitude?.toFixed(6)}, {h.longitude?.toFixed(6)}

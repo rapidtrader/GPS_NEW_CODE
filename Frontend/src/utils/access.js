@@ -18,12 +18,16 @@ const ROUTE_MODULE_MAP = {
   [ROUTES.roadCreate]: 'roads',
   [ROUTES.roadDetail]: 'roads',
   [ROUTES.roadEdit]: 'roads',
+  [ROUTES.machines]: 'machines',
+  [ROUTES.machineCreate]: 'machines',
+  [ROUTES.machineDetail]: 'machines',
+  [ROUTES.machineEdit]: 'machines',
 };
 
 export function getEffectiveModuleAccess(user) {
   if (!user) return [];
   if (user.role === 'admin') {
-    return [...DEFAULT_USER_MODULES, 'liveVehicles', 'users', 'projects', 'roads'];
+    return [...DEFAULT_USER_MODULES, 'liveVehicles', 'users', 'projects', 'roads', 'machines'];
   }
   const access = user.moduleAccess || [];
   if (access.length === 0) return DEFAULT_USER_MODULES;

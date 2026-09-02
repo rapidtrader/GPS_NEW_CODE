@@ -24,6 +24,9 @@ import ProjectDetails from './pages/ProjectDetails';
 import RoadList from './pages/RoadList';
 import RoadCreate from './pages/RoadCreate';
 import RoadDetails from './pages/RoadDetails';
+import MachineList from './pages/MachineList';
+import MachineCreate from './pages/MachineCreate';
+import MachineDetails from './pages/MachineDetails';
 import { ROUTES } from './routes/paths';
 
 function AppRoutes() {
@@ -80,6 +83,12 @@ function AppRoutes() {
               <Route path={ROUTES.roadCreate} element={<RoadCreate />} />
               <Route path={ROUTES.roadDetail} element={<RoadDetails />} />
               <Route path={ROUTES.roadEdit} element={<RoadCreate />} />
+            </Route>
+            <Route element={<ModuleRoute moduleKey="machines" />}>
+              <Route path={ROUTES.machines} element={<MachineList />} />
+              <Route path={ROUTES.machineCreate} element={<MachineCreate />} />
+              <Route path={ROUTES.machineDetail} element={<MachineDetails />} />
+              <Route path={ROUTES.machineEdit} element={<MachineCreate />} />
             </Route>
           </Route>
         </Route>

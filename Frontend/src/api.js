@@ -252,6 +252,52 @@ export function isLoggedIn() {
   return !!getToken();
 }
 
+// ─── Machine Management APIs ───────────────────────────────────────────────
+
+export async function fetchMachines({ projectId, status } = {}) {
+  const params = new URLSearchParams();
+  if (projectId) params.set('projectId', projectId);
+  if (status)    params.set('status',    status);
+  const qs = params.toString();
+  const response = await fetch(`${API_BASE}/api/machines${qs ? `?${qs}` : ''}`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(response);
+}
+
+export async function fetchMachine(id) {
+  const response = await fetch(`${API_BASE}/api/machines/${encodeURIComponent(id)}`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(response);
+}
+
+export async function createMachine(data) {
+  const response = await fetch(`${API_BASE}/api/machines`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(data),
+  });
+  return handleResponse(response);
+}
+
+export async function updateMachine(id, data) {
+  const response = await fetch(`${API_BASE}/api/machines/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(data),
+  });
+  return handleResponse(response);
+}
+
+export async function deleteMachine(id) {
+  const response = await fetch(`${API_BASE}/api/machines/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+  return handleResponse(response);
+}
+
 // ─── Road Management APIs ──────────────────────────────────────────────────
 
 export async function fetchRoads({ projectId, status, areaName, colonyName, frequency } = {}) {

@@ -117,3 +117,11 @@ export function RoadIcon({ className = 'h-5 w-5', strokeWidth = 1.5 }) {
     </svg>
   );
 }
+
+export function MachineIcon({ className = 'h-5 w-5', strokeWidth = 1.5 }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={strokeWidth}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a49.902 49.902 0 00-2.654-.816M17.25 18.75V7.5a2.25 2.25 0 00-2.25-2.25H6a2.25 2.25 0 00-2.25 2.25v11.25m13.5 0V9.375a.375.375 0 00-.375-.375h-1.5a.375.375 0 00-.375.375v9.375m-3-11.25h3" />
+    </svg>
+  );
+}

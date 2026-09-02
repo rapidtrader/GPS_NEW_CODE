@@ -17,6 +17,10 @@ export const ROUTES = {
   roadCreate: '/roads/create',
   roadDetail: '/roads/:id',
   roadEdit: '/roads/:id/edit',
+  machines: '/machines',
+  machineCreate: '/machines/create',
+  machineDetail: '/machines/:id',
+  machineEdit: '/machines/:id/edit',
   login: '/login',
   signup: '/signup',
 };
@@ -36,4 +40,5 @@ export const ROUTE_TITLES = {
   [ROUTES.vehicleHistory]: 'Vehicle History',
   [ROUTES.projects]: 'Projects',
   [ROUTES.roads]: 'Roads',
+  [ROUTES.machines]: 'Machines',
 };

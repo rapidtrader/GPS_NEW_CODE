@@ -14,6 +14,7 @@ export const ADMIN_ONLY_MODULES = [
   { key: 'users', label: 'User Management' },
   { key: 'projects', label: 'Projects' },
   { key: 'roads', label: 'Roads' },
+  { key: 'machines', label: 'Machines' },
 ];
 
 export const MODULE_LABELS = Object.fromEntries(

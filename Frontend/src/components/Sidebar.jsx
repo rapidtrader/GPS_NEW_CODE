@@ -14,6 +14,7 @@ import {
   RouteIcon,
   ProjectIcon,
   RoadIcon,
+  MachineIcon,
 } from './Icons';
 import { ROUTES } from '../routes/paths';
 import { canAccessModule } from '../utils/access';
@@ -123,6 +124,14 @@ const modules = [
     label: 'Roads',
     icon: RoadIcon,
     idleIcon: 'bg-gradient-to-br from-orange-50 to-amber-100 text-orange-600',
+    activeIcon: 'bg-white/20 text-white shadow-inner',
+  },
+  {
+    path: ROUTES.machines,
+    moduleKey: 'machines',
+    label: 'Machines',
+    icon: MachineIcon,
+    idleIcon: 'bg-gradient-to-br from-teal-50 to-cyan-100 text-teal-600',
     activeIcon: 'bg-white/20 text-white shadow-inner',
   },
 ];

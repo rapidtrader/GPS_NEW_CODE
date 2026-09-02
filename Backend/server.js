@@ -105,6 +105,7 @@ app.use('/api/vehicle-history', require('./routes/vehicle-history'));
 app.use('/api/projects', require('./routes/projects'));
 app.use('/api/roads', require('./routes/roads'));
 app.use('/api/machines', require('./routes/machines'));
+app.use('/api/sweeping-plans', require('./routes/sweeping-plans'));
 
 
 async function start() {

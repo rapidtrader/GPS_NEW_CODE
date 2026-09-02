@@ -21,6 +21,7 @@ export const ROUTES = {
   machineCreate: '/machines/create',
   machineDetail: '/machines/:id',
   machineEdit: '/machines/:id/edit',
+  sweepingPlans: '/sweeping-plans',
   login: '/login',
   signup: '/signup',
 };
@@ -41,4 +42,5 @@ export const ROUTE_TITLES = {
   [ROUTES.projects]: 'Projects',
   [ROUTES.roads]: 'Roads',
   [ROUTES.machines]: 'Machines',
+  [ROUTES.sweepingPlans]: 'Daily Sweeping Plan',
 };

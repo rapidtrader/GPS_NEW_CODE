@@ -252,6 +252,54 @@ export function isLoggedIn() {
   return !!getToken();
 }
 
+// ─── Sweeping Plan APIs ────────────────────────────────────────────────────
+
+export async function generateSweepingPlan({ projectId, planDate }) {
+  const response = await fetch(`${API_BASE}/api/sweeping-plans/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ projectId, planDate }),
+  });
+  return handleResponse(response);
+}
+
+export async function fetchSweepingPlans({ projectId, planDate, machineId, status } = {}) {
+  const params = new URLSearchParams();
+  if (projectId) params.set('projectId', projectId);
+  if (planDate)  params.set('planDate',  planDate);
+  if (machineId) params.set('machineId', machineId);
+  if (status)    params.set('status',    status);
+  const qs = params.toString();
+  const response = await fetch(`${API_BASE}/api/sweeping-plans${qs ? `?${qs}` : ''}`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(response);
+}
+
+export async function fetchSweepingPlan(id) {
+  const response = await fetch(`${API_BASE}/api/sweeping-plans/${encodeURIComponent(id)}`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(response);
+}
+
+export async function updateSweepingPlan(id, data) {
+  const response = await fetch(`${API_BASE}/api/sweeping-plans/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(data),
+  });
+  return handleResponse(response);
+}
+
+export async function cancelSweepingPlan(id) {
+  const response = await fetch(`${API_BASE}/api/sweeping-plans/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+  return handleResponse(response);
+}
+
 // ─── Machine Management APIs ───────────────────────────────────────────────
 
 export async function fetchMachines({ projectId, status } = {}) {

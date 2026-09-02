@@ -39,49 +39,60 @@ app.get('/api/geocode', async (req, res) => {
   }
 
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  const fallback = `${lat},${lng}`;
+
+  // Helper: fetch with 5s timeout
+  async function fetchWithTimeout(url, options = {}) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    try {
+      const r = await fetch(url, { ...options, signal: controller.signal });
+      return r;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 
   try {
-    let url, response, data;
-
     if (apiKey) {
-      // Google Maps Geocoding API
-      url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${encodeURIComponent(lat)},${encodeURIComponent(lng)}&key=${apiKey}&language=en&result_type=street_address|route|locality`;
-      response = await fetch(url);
-      data = await response.json();
-
-      if (data.status === 'OK' && data.results?.[0]?.formatted_address) {
-        return res.json({ address: data.results[0].formatted_address });
+      try {
+        const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${encodeURIComponent(lat)},${encodeURIComponent(lng)}&key=${apiKey}&language=en&result_type=street_address|route|locality`;
+        const response = await fetchWithTimeout(url);
+        const data = await response.json();
+        if (data.status === 'OK' && data.results?.[0]?.formatted_address) {
+          return res.json({ address: data.results[0].formatted_address });
+        }
+        console.warn(`[Geocode] Google Maps status: ${data.status}`);
+      } catch (e) {
+        console.warn(`[Geocode] Google Maps failed: ${e.message}`);
       }
-      // Fall through to Nominatim if Google fails
-      console.warn(`[Geocode] Google Maps returned status: ${data.status}, falling back to Nominatim`);
     }
 
-    // Fallback: Nominatim (OpenStreetMap)
-    url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&zoom=17&addressdetails=0`;
-    response = await fetch(url, {
-      headers: {
-        'User-Agent': 'GPS-Tracking-App/1.0 (gps.dynacleanindustries.com)',
-        'Accept': 'application/json',
-        'Accept-Language': 'en',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Nominatim HTTP ${response.status}`);
+    // Fallback: Nominatim
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&zoom=17&addressdetails=0`;
+      const response = await fetchWithTimeout(url, {
+        headers: {
+          'User-Agent': 'GPS-Tracking-App/1.0 (gps.dynacleanindustries.com)',
+          'Accept': 'application/json',
+          'Accept-Language': 'en',
+        },
+      });
+      const contentType = response.headers.get('content-type') || '';
+      if (response.ok && contentType.includes('application/json')) {
+        const data = await response.json();
+        return res.json({ address: data.display_name || fallback });
+      }
+    } catch (e) {
+      console.warn(`[Geocode] Nominatim failed: ${e.message}`);
     }
 
-    const contentType = response.headers.get('content-type') || '';
-    if (!contentType.includes('application/json')) {
-      throw new Error(`Nominatim returned non-JSON: ${contentType}`);
-    }
-
-    data = await response.json();
-    return res.json({ address: data.display_name || `${lat},${lng}` });
+    // Both failed — return coordinates
+    return res.json({ address: fallback });
 
   } catch (err) {
-    console.error('[Geocode] Error:', err.message);
-    // Always return coordinates as fallback — never crash the frontend
-    return res.json({ address: `${lat},${lng}` });
+    console.error('[Geocode] Unexpected error:', err.message);
+    return res.json({ address: fallback });
   }
 });
 

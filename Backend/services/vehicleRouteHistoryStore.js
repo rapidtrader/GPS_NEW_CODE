@@ -76,15 +76,12 @@ async function saveRouteHistory(routeData = [], vehicleNo, userId = null) {
   const parseDate = (dateStr) => {
     if (!dateStr) return null;
     try {
-      // Format: "DD/MM/YYYY HH:MM:SS" or "DD/MM/YYYY HH:MM" (IST timezone)
       const parts = dateStr.split(' ');
       if (parts.length < 2) return null;
 
       const [day, month, year] = parts[0].split('/');
       const [hours, minutes, seconds = '0'] = parts[1].split(':');
 
-      // Create date in local timezone (which is IST on server)
-      // Then convert to UTC for storage
       const localDate = new Date(
         parseInt(year),
         parseInt(month) - 1,
@@ -94,10 +91,8 @@ async function saveRouteHistory(routeData = [], vehicleNo, userId = null) {
         parseInt(seconds)
       );
 
-      // Assuming the time from TBTrack is in IST (UTC+5:30)
-      // Subtract 5:30 hours to get UTC
+      // TBTrack time is IST (UTC+5:30) → convert to UTC for storage
       const utcDate = new Date(localDate.getTime() - (5.5 * 60 * 60 * 1000));
-
       return isNaN(utcDate.getTime()) ? null : utcDate;
     } catch (err) {
       console.warn(`[RouteHistoryStore] Could not parse date: ${dateStr}`);
@@ -105,34 +100,36 @@ async function saveRouteHistory(routeData = [], vehicleNo, userId = null) {
     }
   };
 
+  // Parse all records first
+  const parsed = routeData.map((record) => ({
+    record,
+    addedDate: parseDate(record.added),
+    receivedDate: parseDate(record.actualRecieved),
+  }));
+
+  // Bulk duplicate check — fetch all existing timestamps in one query
+  const timestamps = parsed.map((p) => p.addedDate).filter(Boolean);
+  const existingDocs = timestamps.length > 0
+    ? await VehicleRouteHistory.find(
+        { vehicleNo, added: { $in: timestamps } },
+        { added: 1 }
+      ).lean()
+    : [];
+  const existingSet = new Set(existingDocs.map((d) => d.added.getTime()));
+
   const ops = [];
 
-  for (const record of routeData) {
-    const addedDate = parseDate(record.added);
-    const receivedDate = parseDate(record.actualRecieved);
+  for (const { record, addedDate, receivedDate } of parsed) {
+    // Skip duplicates
+    if (addedDate && existingSet.has(addedDate.getTime())) continue;
 
-    // Skip duplicate - same vehicleNo + added timestamp + syncedBy
-    if (addedDate) {
-      const existing = await VehicleRouteHistory.findOne({ vehicleNo, added: addedDate, syncedBy: userId }).lean();
-      if (existing) continue;
-    }
-
-    // Fetch address from TBTrack using refk
+    // Use address from TBTrack response directly (no extra API call per record)
+    // Geocoding happens on-demand in the frontend via /api/geocode proxy
     let address = record.address;
-    if ((!address || address === 'Not found') && record.refk) {
-      try {
-        const { getAuthToken } = require('./tbtrack');
-        const token = await getAuthToken();
-        const r = await fetch(`https://tbtrack.in/gps/rest/v4/tpr/fetch/refk/address?refk=${record.refk}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const d = await r.json();
-        if (d.status === 'OK' && d.data) address = d.data;
-      } catch (_) {}
-    }
-    // Fallback to lat/long
     if (!address || address === 'Not found') {
-      address = `${record.latitude?.toFixed(4) || '0'}, ${record.longitude?.toFixed(4) || '0'}`;
+      address = (record.latitude && record.longitude)
+        ? `${Number(record.latitude).toFixed(4)}, ${Number(record.longitude).toFixed(4)}`
+        : '';
     }
 
     const doc = new VehicleRouteHistory({
@@ -142,7 +139,7 @@ async function saveRouteHistory(routeData = [], vehicleNo, userId = null) {
       longitude: Number(record.longitude) || null,
       speed: Number(record.speed) || 0,
       added: addedDate,
-      address: address || '',
+      address,
       duration: Number(record.duration) || 0,
       distance: Number(record.distance) || 0,
       actualReceived: receivedDate,

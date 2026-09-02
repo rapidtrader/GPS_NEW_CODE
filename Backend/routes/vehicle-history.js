@@ -74,13 +74,19 @@ router.post('/:vehicleNo/sync', authMiddleware, async (req, res) => {
     // Get auth token
     const token = await getAuthToken();
 
-    // Fetch from TBTrack
+    // Fetch from TBTrack (with 25s timeout so nginx doesn't 504 first)
     console.log(`[VehicleHistory API] Fetching route history from TBTrack...`);
-    const historyData = await fetchRouteHistory(token, {
-      vehicleNo,
-      startTime,
-      endTime,
-    });
+    const fetchWithTimeout = (promise, ms) => {
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(`TBTrack request timed out after ${ms / 1000}s`)), ms)
+      );
+      return Promise.race([promise, timeout]);
+    };
+
+    const historyData = await fetchWithTimeout(
+      fetchRouteHistory(token, { vehicleNo, startTime, endTime }),
+      25000 // 25 seconds — nginx default is 60s, gives us headroom
+    );
 
     console.log(`[VehicleHistory API] Received ${historyData.length} history points`);
 

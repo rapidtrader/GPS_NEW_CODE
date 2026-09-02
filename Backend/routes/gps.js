@@ -120,8 +120,13 @@ router.get('/live/:machineId', authMiddleware, adminMiddleware, async (req, res)
     const project = await Project.findOne({ projectId: machine.projectId }).lean();
     const sweepingSpeedLimit = project?.settings?.sweepingSpeedLimit ?? null;
 
-    // Get latest GPS record — match machineId → vehicleroutehistories.vehicleNo
-    const gpsDoc = await getLatestVehicleLocation(machine.machineId);
+    // Get latest GPS record and live address from Vehicle collection in parallel
+    const Vehicle = require('../models/Vehicle');
+    const [gpsDoc, vehicleDoc] = await Promise.all([
+      getLatestVehicleLocation(machine.machineId),
+      Vehicle.findOne({ vehicleNo: machine.machineId }, { address: 1 }).lean(),
+    ]);
+    const liveAddress = vehicleDoc?.address || null;
 
     if (!gpsDoc) {
       return res.json({
@@ -132,14 +137,11 @@ router.get('/live/:machineId', authMiddleware, adminMiddleware, async (req, res)
           machineName:  machine.machineName,
           vehicleNumber: machine.vehicleNumber,
           projectId:    machine.projectId,
-          latitude:     null,
-          longitude:    null,
-          speed:        null,
-          ignition:     null,
-          sweepingStatus: 'unknown',
+          latitude:     null, longitude: null, speed: null,
+          ignition:     null, sweepingStatus: 'unknown',
           sweepingSignalAvailable: false,
           timestamp:    null,
-          address:      null,
+          address:      liveAddress,
           gpsAvailable: false,
         },
       });
@@ -148,6 +150,7 @@ router.get('/live/:machineId', authMiddleware, adminMiddleware, async (req, res)
     const liveStatus = {
       ...shapeLiveRecord(gpsDoc, machine, sweepingSpeedLimit),
       gpsAvailable: true,
+      address: liveAddress, // Vehicle.address = same source as /map page
     };
 
     // Persist snapshot into Machine.liveGps (fire-and-forget)

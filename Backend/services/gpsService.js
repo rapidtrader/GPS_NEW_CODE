@@ -266,13 +266,25 @@ async function getVehicleRouteHistoryByRange(vehicleNo, startTime, endTime) {
 async function getLiveProjectMachines(activeMachines, sweepingSpeedLimit) {
   if (activeMachines.length === 0) return [];
 
+  const Vehicle = require('../models/Vehicle');
+
   // Match Machine.machineId → VehicleRouteHistory.vehicleNo
   const machineIds = activeMachines.map((m) => m.machineId).filter(Boolean);
-  const latestMap = await getLatestLocationsByMachineIds(machineIds);
 
-  // Shape all machines, then geocode those with no real address (parallel, non-blocking)
+  // Fetch latest GPS data and live addresses from Vehicle collection in parallel
+  const [latestMap, vehicleDocs] = await Promise.all([
+    getLatestLocationsByMachineIds(machineIds),
+    Vehicle.find({ vehicleNo: { $in: machineIds } }, { vehicleNo: 1, address: 1 }).lean(),
+  ]);
+
+  // vehicleNo → live address from Vehicle collection (same source as /map page)
+  const liveAddressMap = new Map(vehicleDocs.map((v) => [v.vehicleNo, v.address || null]));
+
   const shaped = activeMachines.map((machine) => {
     const gpsDoc = latestMap.get(machine.machineId);
+    // Address priority: Vehicle.address (live, same as /map) → VehicleRouteHistory address → null
+    const address = liveAddressMap.get(machine.machineId) || (gpsDoc?.address || null);
+
     if (!gpsDoc) {
       return {
         machineId:    machine.machineId,
@@ -283,22 +295,15 @@ async function getLiveProjectMachines(activeMachines, sweepingSpeedLimit) {
         ignition:     null, sweepingStatus: 'unknown',
         sweepingSignalAvailable: false,
         timestamp:    null, receivedAt: null,
-        address:      null, status: null,
+        address,               // from Vehicle collection
+        status: null,
         gpsAvailable: false,
       };
     }
-    return { ...shapeLiveRecord(gpsDoc, machine, sweepingSpeedLimit), gpsAvailable: true };
+    const record = { ...shapeLiveRecord(gpsDoc, machine, sweepingSpeedLimit), gpsAvailable: true };
+    record.address = address; // override with Vehicle.address (live, same as /map)
+    return record;
   });
-
-  // For machines with GPS but no address, try reverse geocoding in parallel
-  await Promise.allSettled(
-    shaped.map(async (m) => {
-      if (!m.gpsAvailable || m.address) return;
-      if (!m.latitude || !m.longitude) return;
-      const addr = await reverseGeocode(m.latitude, m.longitude);
-      if (addr) m.address = addr;
-    })
-  );
 
   return shaped;
 }

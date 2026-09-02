@@ -102,6 +102,8 @@ app.use('/api/drivers', driverRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/distance-reports', require('./routes/distance-reports'));
 app.use('/api/vehicle-history', require('./routes/vehicle-history'));
+app.use('/api/projects', require('./routes/projects'));
+app.use('/api/roads', require('./routes/roads'));
 
 
 async function start() {

@@ -12,12 +12,14 @@ const ROUTE_MODULE_MAP = {
   [ROUTES.sweeperMonitoring]: 'sweeperMonitoring',
   [ROUTES.liveVehicles]: 'liveVehicles',
   [ROUTES.users]: 'users',
+  [ROUTES.projects]: 'projects',
+  [ROUTES.projectDetail]: 'projects',
 };
 
 export function getEffectiveModuleAccess(user) {
   if (!user) return [];
   if (user.role === 'admin') {
-    return [...DEFAULT_USER_MODULES, 'liveVehicles', 'users'];
+    return [...DEFAULT_USER_MODULES, 'liveVehicles', 'users', 'projects'];
   }
   const access = user.moduleAccess || [];
   if (access.length === 0) return DEFAULT_USER_MODULES;

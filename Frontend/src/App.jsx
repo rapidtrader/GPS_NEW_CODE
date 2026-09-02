@@ -19,6 +19,8 @@ import SweeperMonitoring from './pages/SweeperMonitoring';
 import DistanceReport from './pages/DistanceReport';
 import VehicleHistory from './pages/VehicleHistory';
 import UserManagement from './pages/UserManagement';
+import ProjectList from './pages/ProjectList';
+import ProjectDetails from './pages/ProjectDetails';
 import { ROUTES } from './routes/paths';
 
 function AppRoutes() {
@@ -65,6 +67,10 @@ function AppRoutes() {
             </Route>
             <Route element={<ModuleRoute moduleKey="users" />}>
               <Route path={ROUTES.users} element={<UserManagement />} />
+            </Route>
+            <Route element={<ModuleRoute moduleKey="projects" />}>
+              <Route path={ROUTES.projects} element={<ProjectList />} />
+              <Route path={ROUTES.projectDetail} element={<ProjectDetails />} />
             </Route>
           </Route>
         </Route>

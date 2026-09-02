@@ -251,3 +251,50 @@ export async function reverseGeocodeAddress(lat, lng) {
 export function isLoggedIn() {
   return !!getToken();
 }
+
+// ─── Project Management APIs ───────────────────────────────────────────────
+
+export async function fetchProjects() {
+  const response = await fetch(`${API_BASE}/api/projects`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(response);
+}
+
+export async function fetchProject(id) {
+  const response = await fetch(`${API_BASE}/api/projects/${encodeURIComponent(id)}`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(response);
+}
+
+export async function createProject({ projectId, projectName, status, settings }) {
+  const response = await fetch(`${API_BASE}/api/projects`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ projectId, projectName, status, settings }),
+  });
+  return handleResponse(response);
+}
+
+export async function updateProject(id, { projectName, status, settings }) {
+  const body = {};
+  if (projectName !== undefined) body.projectName = projectName;
+  if (status !== undefined) body.status = status;
+  if (settings !== undefined) body.settings = settings;
+
+  const response = await fetch(`${API_BASE}/api/projects/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(body),
+  });
+  return handleResponse(response);
+}
+
+export async function deleteProject(id) {
+  const response = await fetch(`${API_BASE}/api/projects/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+  return handleResponse(response);
+}

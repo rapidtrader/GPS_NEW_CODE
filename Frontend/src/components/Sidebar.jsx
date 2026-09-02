@@ -12,6 +12,7 @@ import {
   CloseIcon,
   BroomIcon,
   RouteIcon,
+  ProjectIcon,
 } from './Icons';
 import { ROUTES } from '../routes/paths';
 import { canAccessModule } from '../utils/access';
@@ -105,6 +106,14 @@ const modules = [
     label: 'User Management',
     icon: UsersIcon,
     idleIcon: 'bg-gradient-to-br from-purple-50 to-fuchsia-100 text-purple-600',
+    activeIcon: 'bg-white/20 text-white shadow-inner',
+  },
+  {
+    path: ROUTES.projects,
+    moduleKey: 'projects',
+    label: 'Projects',
+    icon: ProjectIcon,
+    idleIcon: 'bg-gradient-to-br from-violet-50 to-indigo-100 text-violet-700',
     activeIcon: 'bg-white/20 text-white shadow-inner',
   },
 ];

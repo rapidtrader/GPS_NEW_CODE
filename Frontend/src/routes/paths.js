@@ -11,6 +11,8 @@ export const ROUTES = {
   sweeperMonitoring: '/sweeper-monitoring',
   distanceReport: '/distance-report',
   vehicleHistory: '/vehicle-history',
+  projects: '/projects',
+  projectDetail: '/projects/:id',
   login: '/login',
   signup: '/signup',
 };
@@ -28,4 +30,5 @@ export const ROUTE_TITLES = {
   [ROUTES.sweeperMonitoring]: 'Sweeper Monitoring',
   [ROUTES.distanceReport]: 'Distance Report',
   [ROUTES.vehicleHistory]: 'Vehicle History',
+  [ROUTES.projects]: 'Projects',
 };

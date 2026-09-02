@@ -78,6 +78,12 @@ function fmtTime(ts) {
   }).replace(',', '').replace(/\bam\b/, 'AM').replace(/\bpm\b/, 'PM');
 }
 
+// Returns null if address is just a coordinate fallback like "30.3136, 76.3942"
+const COORD_RE = /^-?\d+\.\d+,\s*-?\d+\.\d+$/;
+function cleanAddress(addr) {
+  if (!addr || COORD_RE.test(addr.trim())) return null;
+  return addr;
+}
 function IgnitionBadge({ ignition }) {
   if (ignition === true)  return <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[0.65rem] font-semibold text-emerald-700">ON</span>;
   if (ignition === false) return <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[0.65rem] font-semibold text-gray-500">OFF</span>;
@@ -306,7 +312,7 @@ export default function MachineTracking() {
                       <p><span className="font-medium">Speed:</span> {m.speed ?? '—'} KM/H</p>
                       <p><span className="font-medium">Ignition:</span> {m.ignition === true ? 'ON' : m.ignition === false ? 'OFF' : 'Unknown'}</p>
                       <p><span className="font-medium">Sweeping:</span> {m.sweepingStatus === 'not_sweeping' ? 'Not Sweeping' : 'Unknown'}</p>
-                      {m.address && <p className="text-gray-500 text-[0.65rem]">{m.address}</p>}
+                      {cleanAddress(m.address) && <p className="text-gray-500 text-[0.65rem]">{cleanAddress(m.address)}</p>}
                       <p className="text-gray-400 text-[0.65rem]">{fmtTime(m.timestamp)}</p>
                     </div>
                   </Popup>
@@ -334,6 +340,7 @@ export default function MachineTracking() {
                   <th className={thCls}>Sweeping</th>
                   <th className={thCls}>Last Update</th>
                   <th className={thCls}>Location</th>
+                  <th className={thCls}>Address</th>
                   <th className={thCls}>Action</th>
                 </tr>
               </thead>
@@ -354,6 +361,9 @@ export default function MachineTracking() {
                     <td className={tdCls}>{fmtTime(m.timestamp)}</td>
                     <td className={`${tdCls} font-mono text-[0.65rem]`}>
                       {m.latitude != null ? `${m.latitude.toFixed(5)}, ${m.longitude.toFixed(5)}` : '—'}
+                    </td>
+                    <td className={`${tdCls} text-[0.7rem] max-w-[200px] truncate`} title={cleanAddress(m.address) || ''}>
+                      {cleanAddress(m.address) || '—'}
                     </td>
                     <td className={`${tdCls} text-center`}>
                       <button
@@ -389,6 +399,9 @@ export default function MachineTracking() {
                   <div><dt className="font-medium text-gray-500">Ignition</dt><dd><IgnitionBadge ignition={m.ignition} /></dd></div>
                   <div><dt className="font-medium text-gray-500">Sweeping</dt><dd><SweepingBadge status={m.sweepingStatus} /></dd></div>
                   <div><dt className="font-medium text-gray-500">Updated</dt><dd className="text-[0.65rem]">{fmtTime(m.timestamp)}</dd></div>
+                  {cleanAddress(m.address) && (
+                    <div className="col-span-2"><dt className="font-medium text-gray-500">Address</dt><dd className="text-[0.65rem] text-gray-600">{cleanAddress(m.address)}</dd></div>
+                  )}
                 </dl>
                 {m.latitude != null && (
                   <p className="mt-2 font-mono text-[0.65rem] text-gray-400">{m.latitude.toFixed(5)}, {m.longitude.toFixed(5)}</p>

@@ -18,6 +18,48 @@
 
 const VehicleRouteHistory = require('../models/VehicleRouteHistory');
 
+// ── Reverse geocode fallback ──────────────────────────────────────────────────
+// Called only when no real address exists in DB for a vehicle.
+// Uses the same /api/geocode proxy logic (Google Maps → Nominatim).
+async function reverseGeocode(lat, lng) {
+  if (!lat || !lng) return null;
+  try {
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+
+    let address = null;
+
+    if (apiKey) {
+      try {
+        const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}&language=en&result_type=street_address|route|locality`;
+        const r = await fetch(url, { signal: controller.signal });
+        const data = await r.json();
+        if (data.status === 'OK' && data.results?.[0]?.formatted_address) {
+          address = data.results[0].formatted_address;
+        }
+      } catch (_) {}
+    }
+
+    if (!address) {
+      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=17&addressdetails=0`;
+      const r = await fetch(url, {
+        signal: controller.signal,
+        headers: { 'User-Agent': 'GPS-Tracking-App/1.0', 'Accept': 'application/json' },
+      });
+      if (r.ok) {
+        const data = await r.json();
+        address = data.display_name || null;
+      }
+    }
+
+    clearTimeout(timer);
+    return address;
+  } catch (_) {
+    return null;
+  }
+}
+
 // ── Ignition parser ───────────────────────────────────────────────────────────
 // Based on actual status values observed in vehicleroutehistories.
 // Only "Ignition on" / "Ignition off" found — no other confirmed values.
@@ -97,30 +139,65 @@ function shapeLiveRecord(gpsDoc, machine, sweepingSpeedLimit) {
 async function getLatestLocationsByMachineIds(machineIds) {
   if (!Array.isArray(machineIds) || machineIds.length === 0) return new Map();
 
-  // vehicleroutehistories.vehicleNo === Machine.machineId
+  const COORD_RE = /^-?\d+\.\d+,\s*-?\d+\.\d+$/;
+
+  // 1) Latest GPS record per vehicle (for lat/lng/speed/status/timestamp)
   const results = await VehicleRouteHistory.aggregate([
     { $match: { vehicleNo: { $in: machineIds } } },
     { $sort: { vehicleNo: 1, added: -1 } },
     {
       $group: {
         _id: '$vehicleNo',
-        docId: { $first: '$_id' },
-        vehicleNo:       { $first: '$vehicleNo' },
-        latitude:        { $first: '$latitude' },
-        longitude:       { $first: '$longitude' },
-        speed:           { $first: '$speed' },
-        added:           { $first: '$added' },
-        actualReceived:  { $first: '$actualReceived' },
-        status:          { $first: '$status' },
-        address:         { $first: '$address' },
-        ouid:            { $first: '$ouid' },
+        vehicleNo:      { $first: '$vehicleNo' },
+        latitude:       { $first: '$latitude' },
+        longitude:      { $first: '$longitude' },
+        speed:          { $first: '$speed' },
+        added:          { $first: '$added' },
+        actualReceived: { $first: '$actualReceived' },
+        status:         { $first: '$status' },
+        ouid:           { $first: '$ouid' },
       },
     },
   ]);
 
+  // 2) Most recent real address per vehicle — JS-side coord filter
+  const addressCandidates = await VehicleRouteHistory.aggregate([
+    {
+      $match: {
+        vehicleNo: { $in: machineIds },
+        address: { $exists: true, $ne: null, $ne: '' },
+      },
+    },
+    { $sort: { vehicleNo: 1, added: -1 } },
+    {
+      $group: {
+        _id: '$vehicleNo',
+        // collect up to 500 addresses, pick first real one in JS
+        addresses: { $push: '$address' },
+      },
+    },
+    {
+      $project: {
+        addresses: { $slice: ['$addresses', 500] },
+      },
+    },
+  ]);
+
+  // Build address map, filter out coord-only values in JS
+  const addressMap = new Map();
+  for (const a of addressCandidates) {
+    const real = (a.addresses || []).find(
+      (addr) => addr && !COORD_RE.test(addr.trim())
+    );
+    if (real) addressMap.set(a._id, real);
+  }
+
   const map = new Map();
   for (const r of results) {
-    map.set(r.vehicleNo, r); // key = machineId = vehicleNo
+    map.set(r.vehicleNo, {
+      ...r,
+      address: addressMap.get(r.vehicleNo) || null,
+    });
   }
   return map;
 }
@@ -131,9 +208,28 @@ async function getLatestLocationsByMachineIds(machineIds) {
  * @param {string} machineId  — matches VehicleRouteHistory.vehicleNo
  */
 async function getLatestVehicleLocation(machineId) {
-  return VehicleRouteHistory.findOne({ vehicleNo: machineId })
+  const COORD_RE = /^-?\d+\.\d+,\s*-?\d+\.\d+$/;
+
+  const latest = await VehicleRouteHistory.findOne({ vehicleNo: machineId })
     .sort({ added: -1 })
     .lean();
+
+  if (!latest) return null;
+
+  // Scan up to 500 recent records for a real address
+  const recent = await VehicleRouteHistory.find(
+    { vehicleNo: machineId, address: { $exists: true, $ne: null, $ne: '' } }
+  )
+    .sort({ added: -1 })
+    .limit(500)
+    .select('address')
+    .lean();
+
+  const realAddr = recent.find(
+    (r) => r.address && !COORD_RE.test(r.address.trim())
+  );
+
+  return { ...latest, address: realAddr?.address || null };
 }
 
 // ── getVehicleRouteHistoryByRange ─────────────────────────────────────────────
@@ -174,33 +270,37 @@ async function getLiveProjectMachines(activeMachines, sweepingSpeedLimit) {
   const machineIds = activeMachines.map((m) => m.machineId).filter(Boolean);
   const latestMap = await getLatestLocationsByMachineIds(machineIds);
 
-  return activeMachines.map((machine) => {
-    const gpsDoc = latestMap.get(machine.machineId); // key = machineId = vehicleNo
+  // Shape all machines, then geocode those with no real address (parallel, non-blocking)
+  const shaped = activeMachines.map((machine) => {
+    const gpsDoc = latestMap.get(machine.machineId);
     if (!gpsDoc) {
-      // Machine has no GPS data yet
       return {
         machineId:    machine.machineId,
         machineName:  machine.machineName,
         vehicleNumber: machine.vehicleNumber,
         projectId:    machine.projectId,
-        latitude:     null,
-        longitude:    null,
-        speed:        null,
-        ignition:     null,
-        sweepingStatus: 'unknown',
+        latitude:     null, longitude:    null, speed: null,
+        ignition:     null, sweepingStatus: 'unknown',
         sweepingSignalAvailable: false,
-        timestamp:    null,
-        receivedAt:   null,
-        address:      null,
-        status:       null,
+        timestamp:    null, receivedAt: null,
+        address:      null, status: null,
         gpsAvailable: false,
       };
     }
-    return {
-      ...shapeLiveRecord(gpsDoc, machine, sweepingSpeedLimit),
-      gpsAvailable: true,
-    };
+    return { ...shapeLiveRecord(gpsDoc, machine, sweepingSpeedLimit), gpsAvailable: true };
   });
+
+  // For machines with GPS but no address, try reverse geocoding in parallel
+  await Promise.allSettled(
+    shaped.map(async (m) => {
+      if (!m.gpsAvailable || m.address) return;
+      if (!m.latitude || !m.longitude) return;
+      const addr = await reverseGeocode(m.latitude, m.longitude);
+      if (addr) m.address = addr;
+    })
+  );
+
+  return shaped;
 }
 
 module.exports = {

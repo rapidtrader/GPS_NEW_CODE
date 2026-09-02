@@ -252,7 +252,54 @@ export function isLoggedIn() {
   return !!getToken();
 }
 
-// ─── Project Management APIs ───────────────────────────────────────────────
+// ─── Road Management APIs ──────────────────────────────────────────────────
+
+export async function fetchRoads({ projectId, status, areaName, colonyName, frequency } = {}) {
+  const params = new URLSearchParams();
+  if (projectId)  params.set('projectId',  projectId);
+  if (status)     params.set('status',     status);
+  if (areaName)   params.set('areaName',   areaName);
+  if (colonyName) params.set('colonyName', colonyName);
+  if (frequency)  params.set('frequency',  frequency);
+  const qs = params.toString();
+  const response = await fetch(`${API_BASE}/api/roads${qs ? `?${qs}` : ''}`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(response);
+}
+
+export async function fetchRoad(id) {
+  const response = await fetch(`${API_BASE}/api/roads/${encodeURIComponent(id)}`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(response);
+}
+
+export async function createRoad(data) {
+  const response = await fetch(`${API_BASE}/api/roads`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(data),
+  });
+  return handleResponse(response);
+}
+
+export async function updateRoad(id, data) {
+  const response = await fetch(`${API_BASE}/api/roads/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(data),
+  });
+  return handleResponse(response);
+}
+
+export async function deleteRoad(id) {
+  const response = await fetch(`${API_BASE}/api/roads/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+  return handleResponse(response);
+}
 
 export async function fetchProjects() {
   const response = await fetch(`${API_BASE}/api/projects`, {

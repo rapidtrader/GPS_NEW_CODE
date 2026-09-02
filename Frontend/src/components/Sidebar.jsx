@@ -13,6 +13,7 @@ import {
   BroomIcon,
   RouteIcon,
   ProjectIcon,
+  RoadIcon,
 } from './Icons';
 import { ROUTES } from '../routes/paths';
 import { canAccessModule } from '../utils/access';
@@ -114,6 +115,14 @@ const modules = [
     label: 'Projects',
     icon: ProjectIcon,
     idleIcon: 'bg-gradient-to-br from-violet-50 to-indigo-100 text-violet-700',
+    activeIcon: 'bg-white/20 text-white shadow-inner',
+  },
+  {
+    path: ROUTES.roads,
+    moduleKey: 'roads',
+    label: 'Roads',
+    icon: RoadIcon,
+    idleIcon: 'bg-gradient-to-br from-orange-50 to-amber-100 text-orange-600',
     activeIcon: 'bg-white/20 text-white shadow-inner',
   },
 ];

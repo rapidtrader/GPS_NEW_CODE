@@ -109,3 +109,11 @@ export function ProjectIcon({ className = 'h-5 w-5', strokeWidth = 1.5 }) {
     </svg>
   );
 }
+
+export function RoadIcon({ className = 'h-5 w-5', strokeWidth = 1.5 }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={strokeWidth}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M3 14h18M10 3l-2 18M14 3l2 18" />
+    </svg>
+  );
+}

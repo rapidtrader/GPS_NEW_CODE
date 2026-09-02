@@ -14,12 +14,16 @@ const ROUTE_MODULE_MAP = {
   [ROUTES.users]: 'users',
   [ROUTES.projects]: 'projects',
   [ROUTES.projectDetail]: 'projects',
+  [ROUTES.roads]: 'roads',
+  [ROUTES.roadCreate]: 'roads',
+  [ROUTES.roadDetail]: 'roads',
+  [ROUTES.roadEdit]: 'roads',
 };
 
 export function getEffectiveModuleAccess(user) {
   if (!user) return [];
   if (user.role === 'admin') {
-    return [...DEFAULT_USER_MODULES, 'liveVehicles', 'users', 'projects'];
+    return [...DEFAULT_USER_MODULES, 'liveVehicles', 'users', 'projects', 'roads'];
   }
   const access = user.moduleAccess || [];
   if (access.length === 0) return DEFAULT_USER_MODULES;

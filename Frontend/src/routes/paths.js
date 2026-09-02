@@ -13,6 +13,10 @@ export const ROUTES = {
   vehicleHistory: '/vehicle-history',
   projects: '/projects',
   projectDetail: '/projects/:id',
+  roads: '/roads',
+  roadCreate: '/roads/create',
+  roadDetail: '/roads/:id',
+  roadEdit: '/roads/:id/edit',
   login: '/login',
   signup: '/signup',
 };
@@ -31,4 +35,5 @@ export const ROUTE_TITLES = {
   [ROUTES.distanceReport]: 'Distance Report',
   [ROUTES.vehicleHistory]: 'Vehicle History',
   [ROUTES.projects]: 'Projects',
+  [ROUTES.roads]: 'Roads',
 };

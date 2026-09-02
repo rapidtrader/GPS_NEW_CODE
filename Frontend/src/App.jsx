@@ -21,6 +21,9 @@ import VehicleHistory from './pages/VehicleHistory';
 import UserManagement from './pages/UserManagement';
 import ProjectList from './pages/ProjectList';
 import ProjectDetails from './pages/ProjectDetails';
+import RoadList from './pages/RoadList';
+import RoadCreate from './pages/RoadCreate';
+import RoadDetails from './pages/RoadDetails';
 import { ROUTES } from './routes/paths';
 
 function AppRoutes() {
@@ -71,6 +74,12 @@ function AppRoutes() {
             <Route element={<ModuleRoute moduleKey="projects" />}>
               <Route path={ROUTES.projects} element={<ProjectList />} />
               <Route path={ROUTES.projectDetail} element={<ProjectDetails />} />
+            </Route>
+            <Route element={<ModuleRoute moduleKey="roads" />}>
+              <Route path={ROUTES.roads} element={<RoadList />} />
+              <Route path={ROUTES.roadCreate} element={<RoadCreate />} />
+              <Route path={ROUTES.roadDetail} element={<RoadDetails />} />
+              <Route path={ROUTES.roadEdit} element={<RoadCreate />} />
             </Route>
           </Route>
         </Route>

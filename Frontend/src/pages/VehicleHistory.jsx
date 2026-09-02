@@ -419,8 +419,11 @@ export default function VehicleHistory() {
 
   useEffect(() => {
     if (selectedVehicle) {
+      // Fetch cached data immediately, then sync fresh in background
       fetchHistory();
+      syncHistory();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedVehicle]);
 
   // Auto-sync every 1 minute when a vehicle is selected

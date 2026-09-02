@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { createMachine, fetchMachine, fetchProjects, updateMachine } from '../api';
+import { createMachine, fetchMachine, fetchProjects, fetchSavedVehicles, updateMachine } from '../api';
 
 const PURPLE = '#4a3569';
 
@@ -35,7 +35,9 @@ export default function MachineCreate() {
   const [form, setForm]         = useState({ ...EMPTY_FORM });
   const [errors, setErrors]     = useState({});
   const [projects, setProjects] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
+  const [loadingVehicles, setLoadingVehicles] = useState(true);
   const [loadingMachine, setLoadingMachine]   = useState(isEdit);
   const [saving, setSaving]     = useState(false);
   const [toast, setToast]       = useState(null);
@@ -48,6 +50,18 @@ export default function MachineCreate() {
       .then((res) => setProjects(Array.isArray(res.data) ? res.data.filter((p) => p.status === 'active') : []))
       .catch(() => setProjects([]))
       .finally(() => setLoadingProjects(false));
+  }, []);
+
+  // Load saved vehicles for Machine ID dropdown
+  useEffect(() => {
+    fetchSavedVehicles()
+      .then((res) => {
+        const list = Array.isArray(res.data) ? res.data : [];
+        const unique = [...new Set(list.map((v) => v.vehicleNo).filter(Boolean))].sort();
+        setVehicles(unique);
+      })
+      .catch(() => setVehicles([]))
+      .finally(() => setLoadingVehicles(false));
   }, []);
 
   // Load machine for edit
@@ -185,20 +199,38 @@ export default function MachineCreate() {
 
           <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
 
-            {/* Machine ID */}
+            {/* Machine ID — dropdown from saved vehicles */}
             <div>
               <label className={lbl}>Machine ID <span className="text-red-500">*</span></label>
-              <input
-                type="text"
-                className={`${inp(errors.machineId)} ${isEdit ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}
-                placeholder="e.g. SW-01"
-                value={form.machineId}
-                onChange={(e) => setField('machineId', e.target.value)}
-                disabled={isEdit}
-                readOnly={isEdit}
-              />
+              {isEdit ? (
+                <input
+                  type="text"
+                  className={`${inp(false)} bg-gray-50 text-gray-500 cursor-not-allowed`}
+                  value={form.machineId}
+                  disabled
+                />
+              ) : (
+                <select
+                  className={inp(errors.machineId)}
+                  value={form.machineId}
+                  onChange={(e) => setField('machineId', e.target.value)}
+                  disabled={loadingVehicles}
+                >
+                  <option value="">
+                    {loadingVehicles ? 'Loading vehicles…' : '— Select Vehicle ID —'}
+                  </option>
+                  {vehicles.map((vno) => (
+                    <option key={vno} value={vno}>{vno}</option>
+                  ))}
+                </select>
+              )}
               {errors.machineId && <p className={err}>{errors.machineId}</p>}
               {isEdit && <p className="mt-1 text-[0.7rem] text-gray-400">Machine ID cannot be changed.</p>}
+              {!isEdit && !loadingVehicles && vehicles.length === 0 && (
+                <p className="mt-1 text-[0.7rem] text-amber-600">
+                  No saved vehicles found. Sync vehicles from Live Vehicles page first.
+                </p>
+              )}
             </div>
 
             {/* Vehicle Number */}

@@ -85,21 +85,21 @@ function shapeLiveRecord(gpsDoc, machine, sweepingSpeedLimit) {
   };
 }
 
-// ── getLatestLocationsByVehicleNumbers ────────────────────────────────────────
+// ── getLatestLocationsByMachineIds ───────────────────────────────────────────
 /**
- * Efficiently get the latest GPS record for each vehicle using aggregation.
- * Avoids N separate queries — one aggregation pipeline over the indexed collection.
+ * Efficiently get the latest GPS record for each machine using aggregation.
+ * Matches Machine.machineId → VehicleRouteHistory.vehicleNo
+ * (e.g. machineId "1CBM" = vehicleNo "1CBM" in vehicleroutehistories)
  *
- * @param {string[]} vehicleNumbers
+ * @param {string[]} machineIds
  * @returns {Map<vehicleNo, gpsDoc>}
  */
-async function getLatestLocationsByVehicleNumbers(vehicleNumbers) {
-  if (!Array.isArray(vehicleNumbers) || vehicleNumbers.length === 0) return new Map();
+async function getLatestLocationsByMachineIds(machineIds) {
+  if (!Array.isArray(machineIds) || machineIds.length === 0) return new Map();
 
-  // Use $group to get latest added per vehicleNo, then $lookup to get full doc.
-  // This leverages the existing {vehicleNo:1, added:1} index.
+  // vehicleroutehistories.vehicleNo === Machine.machineId
   const results = await VehicleRouteHistory.aggregate([
-    { $match: { vehicleNo: { $in: vehicleNumbers } } },
+    { $match: { vehicleNo: { $in: machineIds } } },
     { $sort: { vehicleNo: 1, added: -1 } },
     {
       $group: {
@@ -120,18 +120,18 @@ async function getLatestLocationsByVehicleNumbers(vehicleNumbers) {
 
   const map = new Map();
   for (const r of results) {
-    map.set(r.vehicleNo, r);
+    map.set(r.vehicleNo, r); // key = machineId = vehicleNo
   }
   return map;
 }
 
 // ── getLatestVehicleLocation ──────────────────────────────────────────────────
 /**
- * Get the single latest GPS record for one vehicle.
- * @param {string} vehicleNo
+ * Get the single latest GPS record for one machine.
+ * @param {string} machineId  — matches VehicleRouteHistory.vehicleNo
  */
-async function getLatestVehicleLocation(vehicleNo) {
-  return VehicleRouteHistory.findOne({ vehicleNo })
+async function getLatestVehicleLocation(machineId) {
+  return VehicleRouteHistory.findOne({ vehicleNo: machineId })
     .sort({ added: -1 })
     .lean();
 }
@@ -170,11 +170,12 @@ async function getVehicleRouteHistoryByRange(vehicleNo, startTime, endTime) {
 async function getLiveProjectMachines(activeMachines, sweepingSpeedLimit) {
   if (activeMachines.length === 0) return [];
 
-  const vehicleNumbers = activeMachines.map((m) => m.vehicleNumber).filter(Boolean);
-  const latestMap = await getLatestLocationsByVehicleNumbers(vehicleNumbers);
+  // Match Machine.machineId → VehicleRouteHistory.vehicleNo
+  const machineIds = activeMachines.map((m) => m.machineId).filter(Boolean);
+  const latestMap = await getLatestLocationsByMachineIds(machineIds);
 
   return activeMachines.map((machine) => {
-    const gpsDoc = latestMap.get(machine.vehicleNumber);
+    const gpsDoc = latestMap.get(machine.machineId); // key = machineId = vehicleNo
     if (!gpsDoc) {
       // Machine has no GPS data yet
       return {
@@ -207,7 +208,7 @@ module.exports = {
   deriveSweepingStatus,
   isValidCoord,
   getLatestVehicleLocation,
-  getLatestLocationsByVehicleNumbers,
+  getLatestLocationsByMachineIds,
   getVehicleRouteHistoryByRange,
   getLiveProjectMachines,
   shapeLiveRecord,

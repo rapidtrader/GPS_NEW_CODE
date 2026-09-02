@@ -65,6 +65,21 @@ const machineSchema = new mongoose.Schema(
       required: true,
       default: 'active',
     },
+
+    // Live GPS snapshot — updated every time /api/gps/live is called.
+    // Source: vehicleroutehistories collection (latest record per vehicleNumber).
+    // Read-only from API perspective — do NOT accept in POST/PUT body.
+    liveGps: {
+      latitude:     { type: Number, default: null },
+      longitude:    { type: Number, default: null },
+      speed:        { type: Number, default: null },
+      ignition:     { type: Boolean, default: null },
+      status:       { type: String,  default: null },  // raw GPS status string e.g. "Ignition on"
+      address:      { type: String,  default: null },
+      gpsTimestamp: { type: Date,    default: null },  // actual GPS event time (added field)
+      gpsUpdatedAt: { type: Date,    default: null },  // when snapshot was last written
+      gpsAvailable: { type: Boolean, default: false },
+    },
   },
   { timestamps: true }
 );

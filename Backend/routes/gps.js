@@ -50,6 +50,42 @@ router.get('/live', authMiddleware, adminMiddleware, async (req, res) => {
 
     const liveData = await getLiveProjectMachines(activeMachines, sweepingSpeedLimit);
 
+    // ── Persist GPS snapshot into Machine.liveGps (fire-and-forget, non-blocking) ──
+    // Runs in background so it never delays the API response.
+    setImmediate(async () => {
+      try {
+        const bulkOps = liveData
+          .filter((m) => m.gpsAvailable)
+          .map((m) => ({
+            updateOne: {
+              filter: { machineId: m.machineId },
+              update: {
+                $set: {
+                  liveGps: {
+                    latitude:     m.latitude,
+                    longitude:    m.longitude,
+                    speed:        m.speed,
+                    ignition:     m.ignition,
+                    status:       m.status,
+                    address:      m.address,
+                    gpsTimestamp: m.timestamp,
+                    gpsUpdatedAt: new Date(),
+                    gpsAvailable: true,
+                  },
+                },
+              },
+            },
+          }));
+
+        if (bulkOps.length > 0) {
+          await Machine.bulkWrite(bulkOps, { ordered: false });
+        }
+      } catch (err) {
+        // Non-critical — log but never crash the request
+        console.error('[GPS Live] Failed to persist liveGps to machines:', err.message);
+      }
+    });
+
     // Build summary counts
     const summary = {
       totalMachines:      liveData.length,
@@ -84,8 +120,8 @@ router.get('/live/:machineId', authMiddleware, adminMiddleware, async (req, res)
     const project = await Project.findOne({ projectId: machine.projectId }).lean();
     const sweepingSpeedLimit = project?.settings?.sweepingSpeedLimit ?? null;
 
-    // Get latest GPS record
-    const gpsDoc = await getLatestVehicleLocation(machine.vehicleNumber);
+    // Get latest GPS record — match machineId → vehicleroutehistories.vehicleNo
+    const gpsDoc = await getLatestVehicleLocation(machine.machineId);
 
     if (!gpsDoc) {
       return res.json({
@@ -113,6 +149,32 @@ router.get('/live/:machineId', authMiddleware, adminMiddleware, async (req, res)
       ...shapeLiveRecord(gpsDoc, machine, sweepingSpeedLimit),
       gpsAvailable: true,
     };
+
+    // Persist snapshot into Machine.liveGps (fire-and-forget)
+    setImmediate(async () => {
+      try {
+        await Machine.updateOne(
+          { machineId: machine.machineId },
+          {
+            $set: {
+              liveGps: {
+                latitude:     liveStatus.latitude,
+                longitude:    liveStatus.longitude,
+                speed:        liveStatus.speed,
+                ignition:     liveStatus.ignition,
+                status:       liveStatus.status,
+                address:      liveStatus.address,
+                gpsTimestamp: liveStatus.timestamp,
+                gpsUpdatedAt: new Date(),
+                gpsAvailable: true,
+              },
+            },
+          }
+        );
+      } catch (err) {
+        console.error('[GPS Live] Failed to persist liveGps (single):', err.message);
+      }
+    });
 
     res.json({ status: 'OK', code: 200, data: liveStatus });
   } catch (error) {

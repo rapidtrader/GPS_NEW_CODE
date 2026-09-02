@@ -70,11 +70,12 @@ function MapFitBounds({ machines }) {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtTime(ts) {
   if (!ts) return '—';
-  return new Date(ts).toLocaleString('en-IN', {
+  const d = new Date(ts);
+  return d.toLocaleString('en-GB', {
     day: '2-digit', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit', second: '2-digit',
     hour12: true, timeZone: 'Asia/Kolkata',
-  });
+  }).replace(',', '').replace(/\bam\b/, 'AM').replace(/\bpm\b/, 'PM');
 }
 
 function IgnitionBadge({ ignition }) {
@@ -239,17 +240,7 @@ export default function MachineTracking() {
         </button>
       </div>
 
-      {/* Sweeping signal note */}
-      {projectId && machines.length > 0 && (
-        <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-700">
-          <svg className="mt-0.5 h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-          </svg>
-          <span>
-            <strong>Sweeping Status Note:</strong> No hardware sweeping sensor signal is available in the current GPS data. Sweeping status shows "Not Sweeping" only when ignition is OFF or speed exceeds the project limit. All other cases show "Unknown" — this does <em>not</em> mean the machine is sweeping.
-          </span>
-        </div>
-      )}
+
 
       {/* Error */}
       {error && (

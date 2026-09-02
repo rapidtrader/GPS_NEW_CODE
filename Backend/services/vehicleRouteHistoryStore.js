@@ -158,10 +158,18 @@ async function saveRouteHistory(routeData = [], vehicleNo, userId = null) {
   if (ops.length > 0) {
     await Promise.all(ops);
     console.log(`[RouteHistoryStore] Saved ${ops.length} route history records for ${vehicleNo}`);
-    return ops.length;
+  } else {
+    console.log(`[RouteHistoryStore] All records duplicate, skipped for ${vehicleNo}`);
   }
-  console.log(`[RouteHistoryStore] All records duplicate, skipped for ${vehicleNo}`);
-  return 0;
+
+  // Always stamp routeHistorySyncedAt — even when all records are duplicates,
+  // the sync itself ran successfully.
+  await Vehicle.findOneAndUpdate(
+    { vehicleNo },
+    { $set: { routeHistorySyncedAt: new Date() } }
+  );
+
+  return ops.length;
 }
 
 async function getRouteHistory(user, vehicleNo, { startDate, endDate } = {}) {

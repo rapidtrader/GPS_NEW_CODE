@@ -21,6 +21,7 @@ const vehicleSchema = new mongoose.Schema(
     satellites: Number,
     rawData: { type: mongoose.Schema.Types.Mixed, required: true },
     syncedAt: { type: Date, default: Date.now },
+    routeHistorySyncedAt: { type: Date, default: null }, // last time route history was synced
   },
   { timestamps: true }
 );

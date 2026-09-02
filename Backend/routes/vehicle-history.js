@@ -141,9 +141,106 @@ router.post('/:vehicleNo/sync', authMiddleware, async (req, res) => {
   }
 });
 
-// POST /sync-cron — cron-job.org calls this every minute with X-Cron-Secret header.
-// No JWT required. Syncs the last 2 hours of route history for the given vehicle.
-// Uses the same fetchRouteHistory + saveRouteHistory logic as /sync.
+// GET /sync-status — returns routeHistorySyncedAt for a vehicle (used by frontend)
+router.get('/:vehicleNo/sync-status', authMiddleware, async (req, res) => {
+  try {
+    const { vehicleNo } = req.params;
+    const Vehicle = require('../models/Vehicle');
+    const vehicle = await Vehicle.findOne({ vehicleNo }, { routeHistorySyncedAt: 1 }).lean();
+    if (!vehicle) {
+      return res.status(404).json({ status: 'ERROR', message: 'Vehicle not found' });
+    }
+    return res.json({
+      status: 'OK',
+      vehicleNo,
+      routeHistorySyncedAt: vehicle.routeHistorySyncedAt ?? null,
+    });
+  } catch (error) {
+    console.error('[VehicleHistory API] sync-status error:', error.message);
+    return res.status(500).json({ status: 'ERROR', message: error.message });
+  }
+});
+
+// POST /sync-cron/all — cron-job.org calls this once to sync ALL vehicles in parallel.
+// Fetches vehicle list from DB, syncs last 2h of route history for each, returns per-vehicle results.
+router.post('/sync-cron/all', cronSecretMiddleware, async (req, res) => {
+  console.log('[VehicleHistory Cron] Bulk sync started for all vehicles');
+
+  try {
+    const Vehicle = require('../models/Vehicle');
+
+    // Load all known vehicles from DB
+    const vehicles = await Vehicle.find({}, { vehicleNo: 1, ouid: 1 }).lean();
+
+    if (!vehicles.length) {
+      console.warn('[VehicleHistory Cron] No vehicles found in DB');
+      return res.status(200).json({ status: 'OK', message: 'No vehicles found', results: [] });
+    }
+
+    console.log(`[VehicleHistory Cron] Found ${vehicles.length} vehicles — syncing all`);
+
+    // Get one shared TBTrack auth token for all vehicles
+    const token = await getAuthToken();
+
+    const endTime = new Date();
+    const startTime = new Date(endTime.getTime() - 2 * 60 * 60 * 1000); // last 2 hours
+
+    const fetchWithTimeout = (promise, ms) => {
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(`TBTrack timed out after ${ms / 1000}s`)), ms)
+      );
+      return Promise.race([promise, timeout]);
+    };
+
+    // Sync all vehicles in parallel — each failure is isolated
+    const results = await Promise.allSettled(
+      vehicles.map(async ({ vehicleNo }) => {
+        if (!vehicleNo) return { vehicleNo: '(unknown)', skipped: true };
+
+        console.log(`[VehicleHistory Cron] Sync started for ${vehicleNo}`);
+        try {
+          const historyData = await fetchWithTimeout(
+            fetchRouteHistory(token, { vehicleNo, startTime, endTime }),
+            25000
+          );
+
+          const savedCount = await saveRouteHistory(historyData, vehicleNo, null);
+
+          console.log(`[VehicleHistory Cron] Sync completed for ${vehicleNo} — saved ${savedCount} new records`);
+          return { vehicleNo, received: historyData.length, savedCount, success: true };
+        } catch (err) {
+          console.error(`[VehicleHistory Cron] Sync failed for ${vehicleNo}: ${err.message}`);
+          return { vehicleNo, success: false, error: err.message };
+        }
+      })
+    );
+
+    // Flatten allSettled results
+    const summary = results.map((r) =>
+      r.status === 'fulfilled' ? r.value : { success: false, error: r.reason?.message }
+    );
+
+    const succeeded = summary.filter((r) => r.success).length;
+    const failed = summary.filter((r) => !r.success && !r.skipped).length;
+
+    console.log(`[VehicleHistory Cron] Bulk sync done — ${succeeded} succeeded, ${failed} failed`);
+
+    return res.status(200).json({
+      status: 'OK',
+      total: vehicles.length,
+      succeeded,
+      failed,
+      startTime: startTime.toISOString(),
+      endTime: endTime.toISOString(),
+      results: summary,
+    });
+  } catch (error) {
+    console.error(`[VehicleHistory Cron] Bulk sync error: ${error.message}`);
+    return res.status(500).json({ status: 'ERROR', message: error.message });
+  }
+});
+
+// POST /sync-cron/:vehicleNo — single vehicle cron sync (kept for backward compatibility)
 router.post('/:vehicleNo/sync-cron', cronSecretMiddleware, async (req, res) => {
   const { vehicleNo } = req.params;
 

@@ -29,6 +29,7 @@ import MachineCreate from './pages/MachineCreate';
 import MachineDetails from './pages/MachineDetails';
 import DailySweepingPlan from './pages/DailySweepingPlan';
 import MachineTracking from './pages/MachineTracking';
+import PlannedVsActual from './pages/PlannedVsActual';
 import { ROUTES } from './routes/paths';
 
 function AppRoutes() {
@@ -97,6 +98,9 @@ function AppRoutes() {
             </Route>
             <Route element={<ModuleRoute moduleKey="machineTracking" />}>
               <Route path={ROUTES.machineTracking} element={<MachineTracking />} />
+            </Route>
+            <Route element={<ModuleRoute moduleKey="plannedVsActual" />}>
+              <Route path={ROUTES.plannedVsActual} element={<PlannedVsActual />} />
             </Route>
           </Route>
         </Route>

@@ -23,6 +23,7 @@ export const ROUTES = {
   machineEdit: '/machines/:id/edit',
   sweepingPlans: '/sweeping-plans',
   machineTracking: '/machine-tracking',
+  plannedVsActual: '/planned-vs-actual',
   login: '/login',
   signup: '/signup',
 };
@@ -45,4 +46,5 @@ export const ROUTE_TITLES = {
   [ROUTES.machines]: 'Machines',
   [ROUTES.sweepingPlans]: 'Daily Sweeping Plan',
   [ROUTES.machineTracking]: 'Machine Tracking',
+  [ROUTES.plannedVsActual]: 'Planned vs Actual',
 };

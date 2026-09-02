@@ -147,7 +147,7 @@ const NAV_ITEMS = [
     icon: BroomIcon,
     idleIcon: 'bg-gradient-to-br from-violet-50 to-indigo-100 text-violet-700',
     activeIcon: 'bg-white/20 text-white shadow-inner',
-    moduleKeys: ['projects', 'roads', 'machines', 'sweepingPlans'],
+    moduleKeys: ['projects', 'roads', 'machines', 'sweepingPlans', 'machineTracking', 'plannedVsActual'],
     children: [
       {
         path: ROUTES.projects,
@@ -187,6 +187,14 @@ const NAV_ITEMS = [
         label: 'Machine Tracking',
         icon: MapIcon,
         idleIcon: 'bg-gradient-to-br from-rose-50 to-pink-100 text-rose-600',
+        activeIcon: 'bg-white/20 text-white shadow-inner',
+      },
+      {
+        path: ROUTES.plannedVsActual,
+        moduleKey: 'plannedVsActual',
+        label: 'Planned vs Actual',
+        icon: ChartIcon,
+        idleIcon: 'bg-gradient-to-br from-sky-50 to-blue-100 text-blue-600',
         activeIcon: 'bg-white/20 text-white shadow-inner',
       },
     ],

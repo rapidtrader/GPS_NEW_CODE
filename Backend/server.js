@@ -107,6 +107,7 @@ app.use('/api/roads', require('./routes/roads'));
 app.use('/api/machines', require('./routes/machines'));
 app.use('/api/sweeping-plans', require('./routes/sweeping-plans'));
 app.use('/api/gps', require('./routes/gps'));
+app.use('/api/planned-vs-actual', require('./routes/planned-vs-actual'));
 
 
 async function start() {

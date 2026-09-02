@@ -252,8 +252,20 @@ export function isLoggedIn() {
   return !!getToken();
 }
 
-// ─── GPS Live Tracking APIs ────────────────────────────────────────────────
+// ─── Planned vs Actual APIs ────────────────────────────────────────────────
 
+export async function fetchPlannedVsActual({ projectId, date, machineId } = {}) {
+  const params = new URLSearchParams();
+  if (projectId) params.set('projectId', projectId);
+  if (date)      params.set('date',      date);
+  if (machineId) params.set('machineId', machineId);
+  const response = await fetch(`${API_BASE}/api/planned-vs-actual?${params}`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(response);
+}
+
+// ─── GPS Live Tracking APIs ────────────────────────────────────────────────
 export async function fetchLiveMachines(projectId) {
   const response = await fetch(
     `${API_BASE}/api/gps/live?projectId=${encodeURIComponent(projectId)}`,

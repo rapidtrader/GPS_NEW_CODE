@@ -9,7 +9,7 @@ const USER_MODULES = [
   'sweeperMonitoring',
 ];
 
-const ADMIN_MODULES = ['liveVehicles', 'users', 'projects', 'roads', 'machines', 'sweepingPlans', 'machineTracking'];
+const ADMIN_MODULES = ['liveVehicles', 'users', 'projects', 'roads', 'machines', 'sweepingPlans', 'machineTracking', 'plannedVsActual'];
 
 const ALL_MODULES = [...USER_MODULES, ...ADMIN_MODULES];
 

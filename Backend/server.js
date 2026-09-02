@@ -31,23 +31,56 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'OK', message: 'GPS Tracking Backend is running' });
 });
 
-// Reverse geocode proxy — forwards to Nominatim so the browser doesn't hit it directly
+// Reverse geocode proxy — Google Maps Geocoding API use karta hai
 app.get('/api/geocode', async (req, res) => {
   const { lat, lng } = req.query;
   if (!lat || !lng) {
     return res.status(400).json({ address: null, error: 'lat and lng are required' });
   }
+
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+
   try {
-    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&zoom=17&addressdetails=0`;
-    const response = await fetch(url, {
-      headers: { 'User-Agent': 'GPS-Tracking-App/1.0 (gps.dynacleanindustries.com)' },
+    let url, response, data;
+
+    if (apiKey) {
+      // Google Maps Geocoding API
+      url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${encodeURIComponent(lat)},${encodeURIComponent(lng)}&key=${apiKey}&language=en&result_type=street_address|route|locality`;
+      response = await fetch(url);
+      data = await response.json();
+
+      if (data.status === 'OK' && data.results?.[0]?.formatted_address) {
+        return res.json({ address: data.results[0].formatted_address });
+      }
+      // Fall through to Nominatim if Google fails
+      console.warn(`[Geocode] Google Maps returned status: ${data.status}, falling back to Nominatim`);
+    }
+
+    // Fallback: Nominatim (OpenStreetMap)
+    url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&zoom=17&addressdetails=0`;
+    response = await fetch(url, {
+      headers: {
+        'User-Agent': 'GPS-Tracking-App/1.0 (gps.dynacleanindustries.com)',
+        'Accept': 'application/json',
+        'Accept-Language': 'en',
+      },
     });
-    if (!response.ok) throw new Error(`Nominatim returned ${response.status}`);
-    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(`Nominatim HTTP ${response.status}`);
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      throw new Error(`Nominatim returned non-JSON: ${contentType}`);
+    }
+
+    data = await response.json();
     return res.json({ address: data.display_name || `${lat},${lng}` });
+
   } catch (err) {
     console.error('[Geocode] Error:', err.message);
-    // Return coordinates as fallback — never crash the frontend
+    // Always return coordinates as fallback — never crash the frontend
     return res.json({ address: `${lat},${lng}` });
   }
 });

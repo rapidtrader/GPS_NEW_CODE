@@ -23,12 +23,13 @@ const ROUTE_MODULE_MAP = {
   [ROUTES.machineDetail]: 'machines',
   [ROUTES.machineEdit]: 'machines',
   [ROUTES.sweepingPlans]: 'sweepingPlans',
+  [ROUTES.machineTracking]: 'machineTracking',
 };
 
 export function getEffectiveModuleAccess(user) {
   if (!user) return [];
   if (user.role === 'admin') {
-    return [...DEFAULT_USER_MODULES, 'liveVehicles', 'users', 'projects', 'roads', 'machines', 'sweepingPlans'];
+    return [...DEFAULT_USER_MODULES, 'liveVehicles', 'users', 'projects', 'roads', 'machines', 'sweepingPlans', 'machineTracking'];
   }
   const access = user.moduleAccess || [];
   if (access.length === 0) return DEFAULT_USER_MODULES;

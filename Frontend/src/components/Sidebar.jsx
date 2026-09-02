@@ -181,6 +181,14 @@ const NAV_ITEMS = [
         idleIcon: 'bg-gradient-to-br from-emerald-50 to-green-100 text-emerald-700',
         activeIcon: 'bg-white/20 text-white shadow-inner',
       },
+      {
+        path: ROUTES.machineTracking,
+        moduleKey: 'machineTracking',
+        label: 'Machine Tracking',
+        icon: MapIcon,
+        idleIcon: 'bg-gradient-to-br from-rose-50 to-pink-100 text-rose-600',
+        activeIcon: 'bg-white/20 text-white shadow-inner',
+      },
     ],
   },
 ];

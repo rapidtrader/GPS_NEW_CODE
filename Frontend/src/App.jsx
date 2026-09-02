@@ -28,6 +28,7 @@ import MachineList from './pages/MachineList';
 import MachineCreate from './pages/MachineCreate';
 import MachineDetails from './pages/MachineDetails';
 import DailySweepingPlan from './pages/DailySweepingPlan';
+import MachineTracking from './pages/MachineTracking';
 import { ROUTES } from './routes/paths';
 
 function AppRoutes() {
@@ -93,6 +94,9 @@ function AppRoutes() {
             </Route>
             <Route element={<ModuleRoute moduleKey="sweepingPlans" />}>
               <Route path={ROUTES.sweepingPlans} element={<DailySweepingPlan />} />
+            </Route>
+            <Route element={<ModuleRoute moduleKey="machineTracking" />}>
+              <Route path={ROUTES.machineTracking} element={<MachineTracking />} />
             </Route>
           </Route>
         </Route>

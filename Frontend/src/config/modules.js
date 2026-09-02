@@ -16,6 +16,7 @@ export const ADMIN_ONLY_MODULES = [
   { key: 'roads', label: 'Roads' },
   { key: 'machines', label: 'Machines' },
   { key: 'sweepingPlans', label: 'Daily Plan' },
+  { key: 'machineTracking', label: 'Machine Tracking' },
 ];
 
 export const MODULE_LABELS = Object.fromEntries(

@@ -252,6 +252,33 @@ export function isLoggedIn() {
   return !!getToken();
 }
 
+// ─── GPS Live Tracking APIs ────────────────────────────────────────────────
+
+export async function fetchLiveMachines(projectId) {
+  const response = await fetch(
+    `${API_BASE}/api/gps/live?projectId=${encodeURIComponent(projectId)}`,
+    { headers: authHeaders() }
+  );
+  return handleResponse(response);
+}
+
+export async function fetchLiveMachine(machineId) {
+  const response = await fetch(
+    `${API_BASE}/api/gps/live/${encodeURIComponent(machineId)}`,
+    { headers: authHeaders() }
+  );
+  return handleResponse(response);
+}
+
+export async function fetchMachineGpsHistory(machineId, { start, end }) {
+  const params = new URLSearchParams({ start, end });
+  const response = await fetch(
+    `${API_BASE}/api/gps/history/${encodeURIComponent(machineId)}?${params}`,
+    { headers: authHeaders() }
+  );
+  return handleResponse(response);
+}
+
 // ─── Sweeping Plan APIs ────────────────────────────────────────────────────
 
 export async function generateSweepingPlan({ projectId, planDate }) {

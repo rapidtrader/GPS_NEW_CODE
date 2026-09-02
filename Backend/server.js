@@ -31,6 +31,27 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'OK', message: 'GPS Tracking Backend is running' });
 });
 
+// Reverse geocode proxy — forwards to Nominatim so the browser doesn't hit it directly
+app.get('/api/geocode', async (req, res) => {
+  const { lat, lng } = req.query;
+  if (!lat || !lng) {
+    return res.status(400).json({ address: null, error: 'lat and lng are required' });
+  }
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&zoom=17&addressdetails=0`;
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'GPS-Tracking-App/1.0 (gps.dynacleanindustries.com)' },
+    });
+    if (!response.ok) throw new Error(`Nominatim returned ${response.status}`);
+    const data = await response.json();
+    return res.json({ address: data.display_name || `${lat},${lng}` });
+  } catch (err) {
+    console.error('[Geocode] Error:', err.message);
+    // Return coordinates as fallback — never crash the frontend
+    return res.json({ address: `${lat},${lng}` });
+  }
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/drivers', driverRoutes);

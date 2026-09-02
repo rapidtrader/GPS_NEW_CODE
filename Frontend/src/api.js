@@ -222,6 +222,32 @@ export function filterVehiclesForUser(vehicles, user = getStoredUser()) {
   );
 }
 
+export async function fetchVehicleHistory(vehicleNo, { startDate, endDate }) {
+  const params = new URLSearchParams({ startDate, endDate });
+  const response = await fetch(`${API_BASE}/api/vehicle-history/${encodeURIComponent(vehicleNo)}?${params}`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(response);
+}
+
+export async function syncVehicleHistory(vehicleNo, { startTime, endTime }) {
+  const response = await fetch(`${API_BASE}/api/vehicle-history/${encodeURIComponent(vehicleNo)}/sync`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ startTime, endTime }),
+  });
+  return handleResponse(response);
+}
+
+export async function reverseGeocodeAddress(lat, lng) {
+  const response = await fetch(
+    `${API_BASE}/api/geocode?lat=${lat}&lng=${lng}`,
+    { headers: authHeaders() }
+  );
+  if (!response.ok) throw new Error('Geocode failed');
+  return response.json(); // { address: "..." }
+}
+
 export function isLoggedIn() {
   return !!getToken();
 }

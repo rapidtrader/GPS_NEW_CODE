@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { fetchSavedVehicles } from '../api';
+import { fetchSavedVehicles, fetchVehicleHistory, syncVehicleHistory, reverseGeocodeAddress } from '../api';
 import { VehicleIcon } from '../components/VehicleIcons';
 import 'leaflet/dist/leaflet.css';
 
@@ -77,8 +77,7 @@ function processGeocodeQueue() {
     return;
   }
 
-  fetch(`/api/geocode?lat=${lat}&lng=${lng}`)
-    .then(r => r.json())
+  reverseGeocodeAddress(lat, lng)
     .then(data => {
       const address = data.address || key;
       geocodeCache.set(key, address);
@@ -347,6 +346,9 @@ export default function VehicleHistory() {
   const [playing, setPlaying] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [addressCache, setAddressCache] = useState({});
+  const [lastSyncedAt, setLastSyncedAt] = useState(null);
+  const autoSyncRef = useRef(null);
+  const syncingRef = useRef(false); // ref-based guard to avoid stale closure in auto-sync
 
   const ITEMS_PER_PAGE = 40;
 
@@ -379,21 +381,10 @@ export default function VehicleHistory() {
     setPlaying(false);
     setCurrentPage(1); // Reset to first page
     try {
-      const params = new URLSearchParams({
+      const data = await fetchVehicleHistory(selectedVehicle, {
         startDate: fromDate,
         endDate: toDate,
       });
-
-      const response = await fetch(`/api/vehicle-history/${selectedVehicle}?${params}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-
-      const data = await response.json();
-      if (!response.ok || data.status === 'ERROR') {
-        throw new Error(data.message || 'Failed to fetch history');
-      }
 
       setHistory(data.data || []);
     } catch (err) {
@@ -406,30 +397,22 @@ export default function VehicleHistory() {
 
   const syncHistory = useCallback(async () => {
     if (!selectedVehicle) return;
+    if (syncingRef.current) return; // already syncing, skip duplicate call
 
+    syncingRef.current = true;
     setSyncing(true);
     setError(null);
     try {
       const { startTime, endTime } = rangeToTimestamp(fromDate, toDate);
 
-      const response = await fetch(`/api/vehicle-history/${selectedVehicle}/sync`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify({ startTime, endTime }),
-      });
-
-      const data = await response.json();
-      if (!response.ok || data.status === 'ERROR') {
-        throw new Error(data.message || 'Failed to sync history');
-      }
+      const data = await syncVehicleHistory(selectedVehicle, { startTime, endTime });
 
       await fetchHistory();
+      setLastSyncedAt(new Date());
     } catch (err) {
       setError(err.message);
     } finally {
+      syncingRef.current = false;
       setSyncing(false);
     }
   }, [selectedVehicle, fromDate, toDate, fetchHistory]);
@@ -439,6 +422,25 @@ export default function VehicleHistory() {
       fetchHistory();
     }
   }, [selectedVehicle]);
+
+  // Auto-sync every 1 minute when a vehicle is selected
+  useEffect(() => {
+    if (!selectedVehicle) return;
+
+    // Clear any existing interval first
+    if (autoSyncRef.current) clearInterval(autoSyncRef.current);
+
+    autoSyncRef.current = setInterval(() => {
+      syncHistory();
+    }, 60 * 1000); // 1 minute
+
+    return () => {
+      if (autoSyncRef.current) {
+        clearInterval(autoSyncRef.current);
+        autoSyncRef.current = null;
+      }
+    };
+  }, [selectedVehicle, syncHistory]);
 
   return (
     <div className="-m-4 min-h-full bg-[#f3f4f6] p-3 sm:-m-6 sm:p-5">
@@ -477,11 +479,12 @@ export default function VehicleHistory() {
               </svg>
               {loading ? 'Loading...' : 'Apply Filter'}
             </button>
+          <div className="flex flex-col gap-1.5 flex-1">
             <button
               type="button"
               onClick={syncHistory}
               disabled={syncing || !selectedVehicle}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold uppercase tracking-wide text-white shadow-sm disabled:opacity-60"
+              className="flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold uppercase tracking-wide text-white shadow-sm disabled:opacity-60"
               style={{ backgroundColor: PURPLE }}
             >
               <svg className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -489,6 +492,13 @@ export default function VehicleHistory() {
               </svg>
               {syncing ? 'Syncing...' : 'Sync Fresh'}
             </button>
+            {lastSyncedAt && (
+              <p className="text-center text-[0.68rem] text-gray-400">
+                Last synced: {lastSyncedAt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
+                <span className="ml-1 text-gray-300">· auto every 1 min</span>
+              </p>
+            )}
+          </div>
           </div>
         </div>
 

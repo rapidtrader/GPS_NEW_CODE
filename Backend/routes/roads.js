@@ -116,7 +116,7 @@ router.post('/', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const {
       projectId, roadId, areaName, colonyName, roadName,
-      totalLength, sweepingFrequency, status, gpsPoints,
+      totalLength, sweepingFrequency, status, gpsPoints, assignedMachineId,
     } = req.body;
 
     // Required field checks
@@ -129,6 +129,10 @@ router.post('/', authMiddleware, adminMiddleware, async (req, res) => {
     const length = Number(totalLength);
     if (isNaN(length) || length <= 0) {
       return res.status(400).json({ status: 'ERROR', message: 'Total length must be a number greater than 0' });
+    }
+
+    if (!assignedMachineId?.trim()) {
+      return res.status(400).json({ status: 'ERROR', message: 'Assigned machine is required' });
     }
 
     if (status && !['active', 'inactive'].includes(status)) {
@@ -162,6 +166,7 @@ router.post('/', authMiddleware, adminMiddleware, async (req, res) => {
       colonyName: colonyName.trim(),
       roadName: roadName.trim(),
       totalLength: length,
+      assignedMachineId: assignedMachineId.trim(),
       sweepingFrequency: {
         type: sweepingFrequency.type,
         startDate: sweepingFrequency.startDate || null,
@@ -187,14 +192,20 @@ router.post('/', authMiddleware, adminMiddleware, async (req, res) => {
 router.put('/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const {
-      areaName, colonyName, roadName, totalLength,
-      sweepingFrequency, status, gpsPoints,
+      projectId, areaName, colonyName, roadName, totalLength,
+      sweepingFrequency, status, gpsPoints, assignedMachineId,
     } = req.body;
 
     const road = await Road.findOne(roadFilter(req.params.id));
     if (!road) return res.status(404).json({ status: 'ERROR', message: 'Road not found' });
 
     // Validate and apply each field if provided
+    if (projectId !== undefined) {
+      if (!String(projectId).trim()) return res.status(400).json({ status: 'ERROR', message: 'Project ID cannot be empty' });
+      const project = await Project.findOne({ projectId: String(projectId).trim() }).lean();
+      if (!project) return res.status(404).json({ status: 'ERROR', message: `Project "${projectId}" not found` });
+      road.projectId = String(projectId).trim();
+    }
     if (areaName !== undefined) {
       if (!String(areaName).trim()) return res.status(400).json({ status: 'ERROR', message: 'Area name cannot be empty' });
       road.areaName = String(areaName).trim();
@@ -234,6 +245,12 @@ router.put('/:id', authMiddleware, adminMiddleware, async (req, res) => {
       if (ptsErr) return res.status(400).json({ status: 'ERROR', message: ptsErr });
       road.gpsPoints = gpsPoints;
       road.routeGeometry = buildRouteGeometry(gpsPoints);
+    }
+    if (assignedMachineId !== undefined) {
+      if (!String(assignedMachineId).trim()) {
+        return res.status(400).json({ status: 'ERROR', message: 'Assigned machine cannot be empty' });
+      }
+      road.assignedMachineId = String(assignedMachineId).trim();
     }
 
     await road.save();

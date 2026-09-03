@@ -102,55 +102,74 @@ function getScheduledRoads(allActiveRoads, planDateStr) {
 /**
  * assignRoadsToMachines(scheduledRoads, activeMachines)
  *
- * Strategy: Largest-Road-First / Best-Fit
+ * Strategy: Largest-Road-First / Worst-Fit (Most Remaining Capacity)
  *   Roads sorted by totalLength DESC.
- *   For each road, pick the machine with the most remaining capacity that can still
- *   fit the road. If no machine fits, assign to the machine with highest remaining
- *   capacity anyway (capacity exceeded flag will be set).
+ *   For each road, pick the machine with the MOST remaining capacity that can still
+ *   fit the road. This distributes roads evenly across all machines.
+ *   If no machine fits, assign to the machine with highest remaining capacity anyway
+ *   (capacity exceeded flag will be set).
  *   Every scheduled road is always assigned — none are silently dropped.
  *
  * @param {Array} scheduledRoads  - road docs with totalLength
  * @param {Array} activeMachines  - machine docs with machineId, sweepingKmPerDay
- * @returns {Map<machineId, {machine, assignedRoads[]}>}
+ * @returns {Array} machineState array
  */
 function assignRoadsToMachines(scheduledRoads, activeMachines) {
   // Build mutable machine state
   const machineState = activeMachines.map((m) => ({
     machine: m,
-    assignedRoads: [],       // {road, sequence}
+    assignedRoads: [],
     assignedKm: 0,
     remainingKm: m.sweepingKmPerDay,
   }));
 
+  // ── Pass 1: assign roads that have a pre-assigned machine ─────────────────
+  const unassignedRoads = [];
   for (const road of scheduledRoads) {
+    if (road.assignedMachineId) {
+      const ms = machineState.find(
+        (s) => s.machine.machineId === road.assignedMachineId,
+      );
+      if (ms) {
+        ms.assignedRoads.push(road);
+        ms.assignedKm  += road.totalLength;
+        ms.remainingKm -= road.totalLength;
+        continue; // skip to next road — this one is pinned
+      }
+    }
+    // No pin or pinned machine not in active list → goes to open pool
+    unassignedRoads.push(road);
+  }
+
+  // ── Pass 2: distribute remaining roads with Worst-Fit (most remaining capacity) ─
+  for (const road of unassignedRoads) {
     const km = road.totalLength;
 
-    // Best-fit: machine where road fits AND remaining capacity is SMALLEST (tightest fit)
-    // This prevents one machine from taking everything while others sit idle.
+    // Worst-fit: pick machine with MOST remaining capacity that can still fit
     let bestFit = null;
-    let bestFitRemaining = Infinity;
+    let bestFitRemaining = -Infinity;
 
     for (const ms of machineState) {
-      if (ms.remainingKm >= km) {
-        // road fits — prefer smallest remaining (tightest fit)
-        if (ms.remainingKm < bestFitRemaining) {
-          bestFitRemaining = ms.remainingKm;
+      if (ms.remainingKm >= km && ms.remainingKm > bestFitRemaining) {
+        bestFitRemaining = ms.remainingKm;
+        bestFit = ms;
+      }
+    }
+
+    if (!bestFit) {
+      // No machine fits → assign to least overloaded machine
+      let maxRemaining = -Infinity;
+      for (const ms of machineState) {
+        if (ms.remainingKm > maxRemaining) {
+          maxRemaining = ms.remainingKm;
           bestFit = ms;
         }
       }
     }
 
-    if (!bestFit) {
-      // No machine can fit the road — assign to machine with most remaining capacity
-      // (least overloaded), even if it causes capacity exceeded
-      machineState.sort((a, b) => b.remainingKm - a.remainingKm);
-      bestFit = machineState[0];
-    }
-
-    // Assign road — sequence = position in this machine's list + 1
     bestFit.assignedRoads.push(road);
-    bestFit.assignedKm   += km;
-    bestFit.remainingKm  -= km;
+    bestFit.assignedKm  += km;
+    bestFit.remainingKm -= km;
   }
 
   return machineState;

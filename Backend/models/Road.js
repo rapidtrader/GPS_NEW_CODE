@@ -86,6 +86,14 @@ const roadSchema = new mongoose.Schema(
       min: [0.001, 'Total length must be greater than 0'],
     },
 
+    // Pre-assign this road to a specific machine
+    // Sweeping plan generator will always assign this road to this machine first
+    assignedMachineId: {
+      type: String,
+      required: [true, 'Assigned machine is required'],
+      trim: true,
+    },
+
     sweepingFrequency: {
       type: sweepingFrequencySchema,
       required: true,

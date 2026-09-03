@@ -262,28 +262,19 @@ export default function MachineCreate() {
             {/* Project */}
             <div className="sm:col-span-2">
               <label className={lbl}>Project <span className="text-red-500">*</span></label>
-              {isEdit ? (
-                <input
-                  type="text"
-                  className={`${inp(false)} bg-gray-50 text-gray-500 cursor-not-allowed`}
-                  value={form.projectId}
-                  disabled
-                />
-              ) : (
-                <select
-                  className={inp(errors.projectId)}
-                  value={form.projectId}
-                  onChange={(e) => setField('projectId', e.target.value)}
-                  disabled={loadingProjects}
-                >
-                  <option value="">{loadingProjects ? 'Loading projects…' : '— Select Project —'}</option>
-                  {projects.map((p) => (
-                    <option key={p.projectId} value={p.projectId}>
-                      {p.projectName} ({p.projectId})
-                    </option>
-                  ))}
-                </select>
-              )}
+              <select
+                className={inp(errors.projectId)}
+                value={form.projectId}
+                onChange={(e) => setField('projectId', e.target.value)}
+                disabled={loadingProjects}
+              >
+                <option value="">{loadingProjects ? 'Loading projects…' : '— Select Project —'}</option>
+                {projects.map((p) => (
+                  <option key={p.projectId} value={p.projectId}>
+                    {p.projectName} ({p.projectId})
+                  </option>
+                ))}
+              </select>
               {errors.projectId && <p className={err}>{errors.projectId}</p>}
             </div>
 

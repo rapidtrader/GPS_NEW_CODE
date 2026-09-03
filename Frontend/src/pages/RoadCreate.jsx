@@ -9,7 +9,7 @@ import {
 } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { createRoad, fetchProjects, fetchRoad, fetchRoads, updateRoad } from '../api';
+import { createRoad, fetchMachines, fetchProjects, fetchRoad, fetchRoads, updateRoad } from '../api';
 
 // ─── Haversine distance (km) between two lat/lng points ──────────────────────
 function haversineKm(lat1, lng1, lat2, lng2) {
@@ -343,6 +343,7 @@ const EMPTY_FORM = {
   colonyName: '',
   roadName: '',
   totalLength: '',
+  assignedMachineId: '',
   status: 'active',
 };
 
@@ -360,6 +361,8 @@ export default function RoadCreate() {
 
   const [projects, setProjects] = useState([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
+  const [machines, setMachines]   = useState([]);
+  const [loadingMachines, setLoadingMachines] = useState(false);
   const [loadingRoad, setLoadingRoad] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
@@ -394,13 +397,14 @@ export default function RoadCreate() {
       .then((res) => {
         const r = res.data;
         setForm({
-          projectId:   r.projectId   || '',
-          roadId:      r.roadId      || '',
-          areaName:    r.areaName    || '',
-          colonyName:  r.colonyName  || '',
-          roadName:    r.roadName    || '',
-          totalLength: String(r.totalLength || ''),
-          status:      r.status      || 'active',
+          projectId:         r.projectId         || '',
+          roadId:            r.roadId            || '',
+          areaName:          r.areaName          || '',
+          colonyName:        r.colonyName        || '',
+          roadName:          r.roadName          || '',
+          totalLength:       String(r.totalLength || ''),
+          assignedMachineId: r.assignedMachineId || '',
+          status:            r.status            || 'active',
         });
         setFreq({
           type:      r.sweepingFrequency?.type      || 'daily',
@@ -410,6 +414,8 @@ export default function RoadCreate() {
           days: r.sweepingFrequency?.days || [],
         });
         setPoints(apiPointsToFormPoints(r.gpsPoints || []));
+        // Allow auto-recalculation from loaded GPS points in edit mode
+        setLengthAutoCalculated(true);
       })
       .catch((err) => showToast(err.message || 'Failed to load road', 'error'))
       .finally(() => setLoadingRoad(false));
@@ -436,6 +442,16 @@ export default function RoadCreate() {
       .finally(() => setLoadingRoadId(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.projectId, isEdit]);
+
+  // ── Load machines for selected project (used in Assigned Machine dropdown) ──
+  useEffect(() => {
+    if (!form.projectId) { setMachines([]); return; }
+    setLoadingMachines(true);
+    fetchMachines({ projectId: form.projectId, status: 'active' })
+      .then((res) => setMachines(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setMachines([]))
+      .finally(() => setLoadingMachines(false));
+  }, [form.projectId]);
 
   // ── Auto-calculate Total Length from GPS points ───────────────────────────
   useEffect(() => {
@@ -501,11 +517,12 @@ export default function RoadCreate() {
   // ── Validation ─────────────────────────────────────────────────────────────
   function validate() {
     const errs = {};
-    if (!form.projectId)                errs.projectId   = 'Project is required';
-    if (!form.roadId.trim())            errs.roadId      = 'Road ID is required';
-    if (!form.areaName.trim())          errs.areaName    = 'Area name is required';
-    if (!form.colonyName.trim())        errs.colonyName  = 'Colony name is required';
-    if (!form.roadName.trim())          errs.roadName    = 'Road name is required';
+    if (!form.projectId)                errs.projectId        = 'Project is required';
+    if (!form.roadId.trim())            errs.roadId           = 'Road ID is required';
+    if (!form.areaName.trim())          errs.areaName         = 'Area name is required';
+    if (!form.colonyName.trim())        errs.colonyName       = 'Colony name is required';
+    if (!form.roadName.trim())          errs.roadName         = 'Road name is required';
+    if (!form.assignedMachineId)        errs.assignedMachineId = 'Assigned machine is required';
     const len = Number(form.totalLength);
     if (!form.totalLength || isNaN(len) || len <= 0) errs.totalLength = 'Total length must be > 0';
 
@@ -546,13 +563,14 @@ export default function RoadCreate() {
     const validPts = points.filter((p) => p.lat !== '' && p.lng !== '');
 
     const payload = {
-      projectId:   form.projectId,
-      roadId:      form.roadId.trim(),
-      areaName:    form.areaName.trim(),
-      colonyName:  form.colonyName.trim(),
-      roadName:    form.roadName.trim(),
-      totalLength: Number(form.totalLength),
-      status:      form.status,
+      projectId:         form.projectId,
+      roadId:            form.roadId.trim(),
+      areaName:          form.areaName.trim(),
+      colonyName:        form.colonyName.trim(),
+      roadName:          form.roadName.trim(),
+      totalLength:       Number(form.totalLength),
+      assignedMachineId: form.assignedMachineId,
+      status:            form.status,
       sweepingFrequency: {
         type:      freq.type,
         startDate: freq.startDate || null,
@@ -564,8 +582,8 @@ export default function RoadCreate() {
     setSaving(true);
     try {
       if (isEdit) {
-        // roadId immutable in edit mode
-        const { roadId, projectId, ...updatePayload } = payload;
+        // roadId immutable in edit mode; projectId is now editable
+        const { roadId, ...updatePayload } = payload;
         await updateRoad(id, updatePayload);
         showToast('Road updated successfully');
         setTimeout(() => navigate(`/roads/${id}`), 1200);
@@ -652,30 +670,21 @@ export default function RoadCreate() {
             {/* Project */}
             <div className="sm:col-span-2">
               <label className={labelCls}>Project <span className="text-red-500">*</span></label>
-              {isEdit ? (
-                <input
-                  type="text"
-                  className={`${inputCls(false)} bg-gray-50 text-gray-500 cursor-not-allowed`}
-                  value={form.projectId}
-                  disabled
-                />
-              ) : (
-                <select
-                  className={inputCls(formErrors.projectId)}
-                  value={form.projectId}
-                  onChange={(e) => setField('projectId', e.target.value)}
-                  disabled={loadingProjects}
-                >
-                  <option value="">
-                    {loadingProjects ? 'Loading projects…' : '— Select Project —'}
+              <select
+                className={inputCls(formErrors.projectId)}
+                value={form.projectId}
+                onChange={(e) => setField('projectId', e.target.value)}
+                disabled={loadingProjects}
+              >
+                <option value="">
+                  {loadingProjects ? 'Loading projects…' : '— Select Project —'}
+                </option>
+                {projects.map((p) => (
+                  <option key={p.projectId} value={p.projectId}>
+                    {p.projectName} ({p.projectId})
                   </option>
-                  {projects.map((p) => (
-                    <option key={p.projectId} value={p.projectId}>
-                      {p.projectName} ({p.projectId})
-                    </option>
-                  ))}
-                </select>
-              )}
+                ))}
+              </select>
               {formErrors.projectId && <p className={errCls}>{formErrors.projectId}</p>}
             </div>
 
@@ -806,6 +815,38 @@ export default function RoadCreate() {
               </select>
             </div>
 
+            {/* Assigned Machine */}
+            <div>
+              <label className={labelCls}>
+                Assigned Machine <span className="text-red-500">*</span>
+              </label>
+              <select
+                className={inputCls(formErrors.assignedMachineId)}
+                value={form.assignedMachineId}
+                onChange={(e) => setField('assignedMachineId', e.target.value)}
+                disabled={!form.projectId || loadingMachines}
+              >
+                <option value="">
+                  {!form.projectId
+                    ? 'Select a project first'
+                    : loadingMachines
+                      ? 'Loading machines…'
+                      : '— Select Machine —'}
+                </option>
+                {machines.map((m) => (
+                  <option key={m.machineId} value={m.machineId}>
+                    {m.machineName} ({m.machineId})
+                  </option>
+                ))}
+              </select>
+              {formErrors.assignedMachineId && <p className={errCls}>{formErrors.assignedMachineId}</p>}
+              {form.assignedMachineId && (
+                <p className="mt-1 text-[0.7rem] text-gray-400">
+                  Daily plan will always assign this road to <strong>{form.assignedMachineId}</strong>.
+                </p>
+              )}
+            </div>
+
             {/* Sweeping Frequency */}
             <div className="sm:col-span-2">
               <label className={labelCls}>Sweeping Frequency <span className="text-red-500">*</span></label>
@@ -855,7 +896,7 @@ export default function RoadCreate() {
           </div>
 
           {/* Map */}
-          <div className="relative" style={{ height: '380px' }}>
+          <div className="relative" style={{ height: 'clamp(280px, 50vw, 420px)' }}>
             <MapContainer
               center={
                 mapMarkers.length > 0
@@ -865,6 +906,8 @@ export default function RoadCreate() {
               zoom={14}
               className="h-full w-full"
               style={{ zIndex: 0 }}
+              tap={true}
+              tapTolerance={15}
             >
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -898,15 +941,21 @@ export default function RoadCreate() {
                 />
               )}
 
-              {/* Markers — draggable to reposition points */}
+              {/* Markers — draggable to reposition points (mouse + touch) */}
               {mapMarkers.map((p) => (
                 <Marker
                   key={p.seq}
                   position={[p.lat, p.lng]}
                   icon={makeIcon(p.seq, p.type)}
                   draggable
+                  autoPan
                   eventHandlers={{
+                    dragstart(e) {
+                      // Prevent map scroll/zoom interfering with drag on touch
+                      e.target._map.dragging.disable();
+                    },
                     dragend(e) {
+                      e.target._map.dragging.enable();
                       const { lat, lng } = e.target.getLatLng();
                       setPoints((prev) =>
                         prev.map((pt) =>
@@ -923,8 +972,8 @@ export default function RoadCreate() {
 
             {/* Map hint overlay */}
             {points.length === 0 && (
-              <div className="pointer-events-none absolute bottom-3 left-1/2 z-[500] -translate-x-1/2 rounded-full bg-black/60 px-4 py-2 text-xs text-white">
-                Click on map to add GPS points
+              <div className="pointer-events-none absolute bottom-3 left-1/2 z-[500] -translate-x-1/2 rounded-full bg-black/60 px-4 py-2 text-xs text-white whitespace-nowrap">
+                Tap / Click on map to add GPS points
               </div>
             )}
           </div>

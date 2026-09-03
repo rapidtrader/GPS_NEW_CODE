@@ -989,15 +989,14 @@ function CombinedMapPanel({ machines }) {
                 if (showGpsDots && r.plannedRoute) {
                   r.plannedRoute.forEach((pt, pidx) => {
                     const side = (pidx + ridx + 1) % 2 === 0 ? 'right' : 'left';
-                    const labelBg = color.light + '70';
                     elements.push(
                       <CircleMarker
                         key={`${m.machineId}-pd-${ridx}-${pidx}`}
                         center={pt}
                         radius={2.2}
                         pathOptions={{
-                          color: '#6d28d9',
-                          fillColor: '#6d28d9',
+                          color: color.base,
+                          fillColor: color.base,
                           fillOpacity: 1,
                           weight: 0,
                         }}
@@ -1011,14 +1010,15 @@ function CombinedMapPanel({ machines }) {
                         >
                           <div style={{
                             padding: '3px 6px',
-                            background: '#f5f3ff',
+                            background: color.light + 'cc',
                             borderRadius: 6,
                             fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
                             fontSize: 10,
-                            color: '#4c1d95',
+                            color: color.base,
                             whiteSpace: 'nowrap',
                             textAlign: 'left',
-                            border: '1px solid #6d28d9',
+                            border: `1px solid ${color.base}`,
+                            fontWeight: 600,
                           }}>
                             📋 {pt[0].toFixed(6)}, {pt[1].toFixed(6)}
                           </div>
@@ -1156,13 +1156,15 @@ function CombinedMapPanel({ machines }) {
                         >
                           <div style={{
                             padding: '3px 6px',
-                            background: '#f3f4f6',
+                            background: color.light + 'cc',
                             borderRadius: 6,
                             fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
                             fontSize: 10,
-                            color: '#374151',
+                            color: color.base,
                             whiteSpace: 'nowrap',
                             textAlign: 'left',
+                            border: `1px solid ${color.base}`,
+                            fontWeight: 600,
                           }}>
                             📍 {pt[0].toFixed(6)}, {pt[1].toFixed(6)}
                           </div>

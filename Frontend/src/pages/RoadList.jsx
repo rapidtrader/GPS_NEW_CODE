@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchRoads, fetchProjects, deleteRoad } from '../api';
+import { fetchRoads, fetchProjects, fetchMachines, deleteRoad, updateRoad } from '../api';
 
 const PURPLE = '#4a3569';
 const PAGE_SIZE = 10;
@@ -74,6 +74,8 @@ export default function RoadList() {
   const navigate = useNavigate();
   const [rows, setRows]           = useState([]);
   const [projects, setProjects]   = useState([]);
+  const [machinesByProject, setMachinesByProject] = useState({}); // { projectId: [machine, ...] }
+  const [savingMachine, setSavingMachine] = useState({}); // { roadId: true/false }
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState('');
   const [search, setSearch]       = useState('');
@@ -91,6 +93,22 @@ export default function RoadList() {
 
   function showToast(msg, type = 'success') { setToast({ message: msg, type }); }
 
+  // ── Inline machine assignment ───────────────────────────────────────────────
+  async function handleMachineChange(road, machineId) {
+    setSavingMachine((s) => ({ ...s, [road.roadId]: true }));
+    try {
+      await updateRoad(road.roadId, { assignedMachineId: machineId });
+      setRows((prev) =>
+        prev.map((r) => r.roadId === road.roadId ? { ...r, assignedMachineId: machineId } : r)
+      );
+      showToast(`Machine updated for ${road.roadName}`);
+    } catch (err) {
+      showToast(err.message || 'Failed to update machine', 'error');
+    } finally {
+      setSavingMachine((s) => ({ ...s, [road.roadId]: false }));
+    }
+  }
+
   // ── Load ───────────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -99,8 +117,23 @@ export default function RoadList() {
         fetchRoads(),
         fetchProjects(),
       ]);
-      setRows(Array.isArray(roadsRes.data) ? roadsRes.data : []);
-      setProjects(Array.isArray(projRes.data) ? projRes.data : []);
+      const roadList = Array.isArray(roadsRes.data) ? roadsRes.data : [];
+      const projList = Array.isArray(projRes.data)  ? projRes.data  : [];
+      setRows(roadList);
+      setProjects(projList);
+
+      // Fetch machines for every unique project that has roads
+      const uniqueProjectIds = [...new Set(roadList.map((r) => r.projectId).filter(Boolean))];
+      const machineResults = await Promise.all(
+        uniqueProjectIds.map((pid) =>
+          fetchMachines({ projectId: pid, status: 'active' })
+            .then((res) => ({ pid, machines: Array.isArray(res.data) ? res.data : [] }))
+            .catch(() => ({ pid, machines: [] }))
+        )
+      );
+      const byProject = {};
+      machineResults.forEach(({ pid, machines }) => { byProject[pid] = machines; });
+      setMachinesByProject(byProject);
     } catch (err) {
       setError(err.message || 'Failed to load roads');
     } finally {
@@ -285,6 +318,7 @@ export default function RoadList() {
               <th className={thCls}>Colony</th>
               <th className={thCls}>Length</th>
               <th className={thCls}>Frequency</th>
+              <th className={thCls}>Machine</th>
               <th className={thCls}>Status</th>
               <th className={thCls}>Actions</th>
             </tr>
@@ -292,7 +326,7 @@ export default function RoadList() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={10} className="py-12 text-center text-sm text-gray-400">
+                <td colSpan={11} className="py-12 text-center text-sm text-gray-400">
                   <div className="flex items-center justify-center gap-2">
                     <svg className="h-5 w-5 animate-spin text-violet-500" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
@@ -304,7 +338,7 @@ export default function RoadList() {
               </tr>
             ) : pageRows.length === 0 ? (
               <tr>
-                <td colSpan={10} className="py-12 text-center text-sm text-gray-400">
+                <td colSpan={11} className="py-12 text-center text-sm text-gray-400">
                   {hasFilters ? 'No roads match your filters.' : 'No roads yet. Click "Add Road" to create one.'}
                 </td>
               </tr>
@@ -320,6 +354,32 @@ export default function RoadList() {
                   <td className={tdCls}>{row.totalLength} KM</td>
                   <td className={tdCls}>
                     <FreqBadge type={row.sweepingFrequency?.type} />
+                  </td>
+                  {/* Inline Machine dropdown */}
+                  <td className={tdCls} style={{ minWidth: '130px' }}>
+                    <div className="relative">
+                      <select
+                        value={row.assignedMachineId || ''}
+                        onChange={(e) => handleMachineChange(row, e.target.value)}
+                        disabled={savingMachine[row.roadId]}
+                        className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-[0.65rem] text-gray-700 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-200 disabled:opacity-60"
+                      >
+                        <option value="">— None —</option>
+                        {(machinesByProject[row.projectId] || []).map((m) => (
+                          <option key={m.machineId} value={m.machineId}>
+                            {m.machineId}
+                          </option>
+                        ))}
+                      </select>
+                      {savingMachine[row.roadId] && (
+                        <span className="pointer-events-none absolute right-5 top-1/2 -translate-y-1/2">
+                          <svg className="h-3 w-3 animate-spin text-violet-500" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                          </svg>
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className={tdCls}>
                     <StatusBadge status={row.status} />
@@ -381,6 +441,33 @@ export default function RoadList() {
                   <div><dt className="font-medium text-gray-500">Length</dt><dd>{row.totalLength} KM</dd></div>
                   <div><dt className="font-medium text-gray-500">Frequency</dt><dd><FreqBadge type={row.sweepingFrequency?.type} /></dd></div>
                 </dl>
+                {/* Inline machine dropdown — mobile */}
+                <div className="mt-3">
+                  <label className="mb-1 block text-xs font-medium text-gray-500">Assigned Machine</label>
+                  <div className="relative">
+                    <select
+                      value={row.assignedMachineId || ''}
+                      onChange={(e) => handleMachineChange(row, e.target.value)}
+                      disabled={savingMachine[row.roadId]}
+                      className="w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-200 disabled:opacity-60"
+                    >
+                      <option value="">— None —</option>
+                      {(machinesByProject[row.projectId] || []).map((m) => (
+                        <option key={m.machineId} value={m.machineId}>
+                          {m.machineId} — {m.machineName}
+                        </option>
+                      ))}
+                    </select>
+                    {savingMachine[row.roadId] && (
+                      <span className="pointer-events-none absolute right-7 top-1/2 -translate-y-1/2">
+                        <svg className="h-3 w-3 animate-spin text-violet-500" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                        </svg>
+                      </span>
+                    )}
+                  </div>
+                </div>
                 <div className="mt-3 flex gap-2 border-t border-gray-100 pt-3">
                   <button onClick={() => navigate(`/roads/${row.roadId}`)}
                     className="flex-1 rounded-lg py-1.5 text-xs font-semibold text-violet-700 ring-1 ring-violet-300 hover:bg-violet-50 transition-colors">View</button>

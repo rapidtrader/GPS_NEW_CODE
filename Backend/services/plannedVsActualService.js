@@ -236,6 +236,66 @@ function roadLengthFromGpsPoints(roadCoords) {
 }
 
 /**
+ * Split planned route polyline into COVERED (green) and MISSED (yellow) polyline
+ * segments based on which road-fraction buckets were covered.
+ *
+ * @param {Array} roadCoords    - array of {lat, lng} representing the planned route
+ * @param {Set<number>} coveredBuckets - bucket indices (0..NUM_BUCKETS-1) that were covered
+ * @param {number} NUM_BUCKETS  - number of buckets used in coverage calculation
+ * @returns {{ coveredPlannedSegments: Array<Array<[number,number]>>,
+ *             missedPlannedSegments:  Array<Array<[number,number]>> }}
+ */
+function splitPlannedRouteByCoverage(roadCoords, coveredBuckets, NUM_BUCKETS) {
+  const N = roadCoords.length;
+  if (N < 2) return { coveredPlannedSegments: [], missedPlannedSegments: [] };
+
+  // Step 1: Cumulative length along the road + segment start fractions
+  const cumMeters = [0];
+  let totalMeters = 0;
+  for (let i = 0; i < N - 1; i++) {
+    totalMeters += haversineMeters(
+      roadCoords[i].lat, roadCoords[i].lng,
+      roadCoords[i + 1].lat, roadCoords[i + 1].lng
+    );
+    cumMeters.push(totalMeters);
+  }
+  if (totalMeters === 0) {
+    return {
+      coveredPlannedSegments: [roadCoords.map((c) => [c.lat, c.lng])],
+      missedPlannedSegments: [],
+    };
+  }
+
+  // Step 2: Classify each segment (i → i+1) by midpoint fraction → bucket
+  const segClasses = []; // true = covered, false = missed
+  for (let i = 0; i < N - 1; i++) {
+    const midMeters = (cumMeters[i] + cumMeters[i + 1]) / 2;
+    const fraction = Math.min(1, Math.max(0, midMeters / totalMeters));
+    const bucket = Math.min(NUM_BUCKETS - 1, Math.floor(fraction * NUM_BUCKETS));
+    segClasses.push(coveredBuckets.has(bucket));
+  }
+
+  // Step 3: Merge contiguous same-class segments into polylines
+  const covered = [];
+  const missed = [];
+  let current = null; // { cls: bool, arr: [] }
+  for (let i = 0; i < N - 1; i++) {
+    const cls = segClasses[i];
+    if (!current || current.cls !== cls) {
+      if (current && current.arr.length >= 2) {
+        if (current.cls) covered.push(current.arr); else missed.push(current.arr);
+      }
+      current = { cls, arr: [[roadCoords[i].lat, roadCoords[i].lng]] };
+    }
+    current.arr.push([roadCoords[i + 1].lat, roadCoords[i + 1].lng]);
+  }
+  if (current && current.arr.length >= 2) {
+    if (current.cls) covered.push(current.arr); else missed.push(current.arr);
+  }
+  return { coveredPlannedSegments: covered, missedPlannedSegments: missed };
+}
+
+/**
  * Calculate actual swept fraction of a single road.
  *
  * Algorithm:
@@ -254,23 +314,28 @@ function roadLengthFromGpsPoints(roadCoords) {
  * @returns {object} { actualKm, coveragePercent, sweepingSignalAvailable, bucketsCovered }
  */
 function calculateRoadCoverage(roadCoords, gpsPoints, sweepingSpeedLimit, toleranceMeters, maxGapMs) {
+  const NUM_BUCKETS = 200;
   if (roadCoords.length < MIN_ROAD_GPS_POINTS || gpsPoints.length === 0) {
     return {
       actualKm: 0,
       coveragePercent: 0,
       sweepingSignalAvailable: false,
       onRoadPointCount: 0,
+      coveredBuckets: new Set(),
+      numBuckets: NUM_BUCKETS,
     };
   }
 
   const roadLengthKm = roadLengthFromGpsPoints(roadCoords);
   if (roadLengthKm <= 0) {
-    return { actualKm: 0, coveragePercent: 0, sweepingSignalAvailable: false, onRoadPointCount: 0 };
+    return {
+      actualKm: 0, coveragePercent: 0, sweepingSignalAvailable: false,
+      onRoadPointCount: 0, coveredBuckets: new Set(), numBuckets: NUM_BUCKETS,
+    };
   }
 
   // Discretize road into 200 equal buckets to track unique coverage.
   // Each bucket = 0.5% of road length. This avoids double-counting repeated passes.
-  const NUM_BUCKETS = 200;
   const coveredBuckets = new Set();
   let onRoadPointCount = 0;
 
@@ -304,6 +369,8 @@ function calculateRoadCoverage(roadCoords, gpsPoints, sweepingSpeedLimit, tolera
     coveragePercent,
     sweepingSignalAvailable: false, // No hardware signal confirmed in this GPS data
     onRoadPointCount,
+    coveredBuckets,
+    numBuckets: NUM_BUCKETS,
   };
 }
 
@@ -404,6 +471,8 @@ function calculatePlannedVsActual(plan, machine, project, roadMap, rawGpsDocs, o
         status:           'not_completed',
         error:            'Road master data not found',
         plannedRoute:     [],
+        coveredPlannedSegments: [],
+        missedPlannedSegments:  [],
         sweepingSignalAvailable: false,
         onRoadPointCount: 0,
       });
@@ -414,6 +483,7 @@ function calculatePlannedVsActual(plan, machine, project, roadMap, rawGpsDocs, o
     const roadCoords = roadGpsPointsToLatLng(road.gpsPoints || []);
 
     if (roadCoords.length < MIN_ROAD_GPS_POINTS) {
+      const plannedRoute = roadCoords.map((c) => [c.lat, c.lng]);
       roadResults.push({
         roadId:     road.roadId,
         roadName:   road.roadName,
@@ -426,7 +496,9 @@ function calculatePlannedVsActual(plan, machine, project, roadMap, rawGpsDocs, o
         coveragePercent:  0,
         status:           'not_completed',
         error:            'Road has insufficient GPS points (< 2)',
-        plannedRoute:     roadCoords.map((c) => [c.lat, c.lng]),
+        plannedRoute,
+        coveredPlannedSegments: [],
+        missedPlannedSegments:  plannedRoute.length >= 2 ? [plannedRoute] : [],
         sweepingSignalAvailable: false,
         onRoadPointCount: 0,
       });
@@ -435,6 +507,7 @@ function calculatePlannedVsActual(plan, machine, project, roadMap, rawGpsDocs, o
     }
 
     if (cleanedGps.length === 0) {
+      const plannedRoute = roadCoords.map((c) => [c.lat, c.lng]);
       roadResults.push({
         roadId:     road.roadId,
         roadName:   road.roadName,
@@ -447,7 +520,9 @@ function calculatePlannedVsActual(plan, machine, project, roadMap, rawGpsDocs, o
         coveragePercent:  0,
         status:           'not_completed',
         error:            'No GPS data available for this vehicle on this date',
-        plannedRoute:     roadCoords.map((c) => [c.lat, c.lng]),
+        plannedRoute,
+        coveredPlannedSegments: [],
+        missedPlannedSegments:  plannedRoute.length >= 2 ? [plannedRoute] : [],
         sweepingSignalAvailable: false,
         onRoadPointCount: 0,
       });
@@ -457,6 +532,11 @@ function calculatePlannedVsActual(plan, machine, project, roadMap, rawGpsDocs, o
 
     const coverage = calculateRoadCoverage(
       roadCoords, cleanedGps, sweepingSpeedLimit, toleranceMeters, maxGapMs
+    );
+
+    // Split planned route into covered (green) & missed (yellow) visual segments
+    const split = splitPlannedRouteByCoverage(
+      roadCoords, coverage.coveredBuckets, coverage.numBuckets
     );
 
     // Use plannedKm from plan (master data) as denominator
@@ -485,6 +565,8 @@ function calculatePlannedVsActual(plan, machine, project, roadMap, rawGpsDocs, o
       coveragePercent,
       status,
       plannedRoute:    roadCoords.map((c) => [c.lat, c.lng]),
+      coveredPlannedSegments: split.coveredPlannedSegments,
+      missedPlannedSegments:  split.missedPlannedSegments,
       sweepingSignalAvailable: false,
       onRoadPointCount: coverage.onRoadPointCount,
     });

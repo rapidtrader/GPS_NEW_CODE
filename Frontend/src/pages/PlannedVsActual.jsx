@@ -159,13 +159,13 @@ function calcRoadCoverage(plannedRoute, actualFlat, radiusM = 200) {
 
 // ── Split a planned polyline into COVERED / MISSED segments ───────────────────
 // Algorithm:
-//   For each planned segment A→B:
-//     1. Sample the segment at ~10m intervals (interpolated points)
-//     2. If ANY sampled point is within radiusM of ANY actual GPS point → covered
-//   This handles sparse planned waypoints correctly.
+//   1. Dense-interpolate the actual GPS track (every 15m) to fill GPS polling gaps
+//   2. For each planned waypoint, check if it is within radiusM of any actual point
+//   3. A planned segment A→B is COVERED if A or B (or any midpoint every 10m) is
+//      within radiusM of the dense actual track
+//   radiusM default = 200m as specified
 
 function interpolateSegment(a, b, stepMeters = 10) {
-  // Returns array of [lat,lng] points along A→B spaced ~stepMeters apart
   const totalM = haversineMeters(a, b);
   if (totalM <= stepMeters) return [a, b];
   const steps = Math.ceil(totalM / stepMeters);
@@ -177,29 +177,38 @@ function interpolateSegment(a, b, stepMeters = 10) {
   return pts;
 }
 
+// Build dense GPS track from sparse actual points (fills polling gaps)
+function buildDenseActual(actualFlat, stepMeters = 15) {
+  if (!actualFlat || actualFlat.length === 0) return [];
+  const dense = [];
+  for (let i = 0; i < actualFlat.length - 1; i++) {
+    const pts = interpolateSegment(actualFlat[i], actualFlat[i + 1], stepMeters);
+    for (const p of pts) dense.push(p);
+  }
+  dense.push(actualFlat[actualFlat.length - 1]);
+  return dense;
+}
+
+// Is a single point within radiusM of any point in the dense actual track?
+function pointNearActual(pt, denseActual, radiusM) {
+  for (let i = 0; i < denseActual.length; i++) {
+    if (haversineMeters(pt, denseActual[i]) <= radiusM) return true;
+  }
+  return false;
+}
+
 function splitPlannedByProximity(planned, actualFlat, radiusM = 200) {
   if (!Array.isArray(planned) || planned.length < 2) return { covered: [], missed: [] };
   if (!Array.isArray(actualFlat) || actualFlat.length === 0) {
     return { covered: [], missed: [planned] };
   }
 
-  // Build a dense set of actual GPS points by interpolating between consecutive GPS points.
-  // GPS polls every ~30-60s; at sweeper speed (~20-30 km/h) gaps can be 200-500m.
-  // Without interpolation, planned segments between two GPS points get missed.
-  const denseActual = [];
-  for (let i = 0; i < actualFlat.length - 1; i++) {
-    const pts = interpolateSegment(actualFlat[i], actualFlat[i + 1], 15);
-    for (const p of pts) denseActual.push(p);
-  }
-  if (actualFlat.length > 0) denseActual.push(actualFlat[actualFlat.length - 1]);
+  const denseActual = buildDenseActual(actualFlat, 15);
 
-  // For each planned segment, sample it and check proximity to dense actual GPS
   function segmentCovered(a, b) {
     const samples = interpolateSegment(a, b, 10);
     for (const sample of samples) {
-      for (let i = 0; i < denseActual.length; i++) {
-        if (haversineMeters(sample, denseActual[i]) <= radiusM) return true;
-      }
+      if (pointNearActual(sample, denseActual, radiusM)) return true;
     }
     return false;
   }

@@ -93,13 +93,13 @@ router.get('/', authMiddleware, adminMiddleware, async (req, res) => {
 
     // ── Load GPS history per vehicle (one query per vehicle) ─────────────────
     const { startUtc, endUtc } = planDateToUtcRange(date);
-    const vehicleNumbers = [...new Set(machines.map((m) => m.vehicleNumber).filter(Boolean))];
+    // GPS history is stored by machineId (vehicleNo field), NOT by vehicleNumber (registration plate)
 
-    const gpsDataMap = new Map(); // vehicleNumber → cleaned GPS docs
+    const gpsDataMap = new Map(); // machineId → GPS docs
     await Promise.all(
-      vehicleNumbers.map(async (vno) => {
-        const docs = await getVehicleRouteHistoryByRange(vno, startUtc, endUtc);
-        gpsDataMap.set(vno, docs);
+      machineIds.map(async (mid) => {
+        const docs = await getVehicleRouteHistoryByRange(mid, startUtc, endUtc);
+        gpsDataMap.set(mid, docs);
       })
     );
 
@@ -118,7 +118,8 @@ router.get('/', authMiddleware, adminMiddleware, async (req, res) => {
         continue;
       }
 
-      const rawGpsDocs = gpsDataMap.get(machine.vehicleNumber) || [];
+      // Use machineId (not vehicleNumber) to look up GPS data
+      const rawGpsDocs = gpsDataMap.get(machine.machineId) || [];
 
       const result = calculatePlannedVsActual(
         plan, machine, project, roadMap, rawGpsDocs,

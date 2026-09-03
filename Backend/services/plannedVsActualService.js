@@ -363,6 +363,19 @@ function calculatePlannedVsActual(plan, machine, project, roadMap, rawGpsDocs, o
   // Build actual route segments for map display
   const actualRouteSegments = buildActualRouteSegments(cleanedGps, maxGapMs);
 
+  // Total GPS travel distance (actual odometer — regardless of road proximity)
+  let totalGpsTravelKm = 0;
+  for (let i = 1; i < cleanedGps.length; i++) {
+    const gap = cleanedGps[i].added - cleanedGps[i - 1].added;
+    if (gap <= maxGapMs) {
+      totalGpsTravelKm += haversineMeters(
+        cleanedGps[i - 1].lat, cleanedGps[i - 1].lng,
+        cleanedGps[i].lat,     cleanedGps[i].lng,
+      ) / 1000;
+    }
+  }
+  totalGpsTravelKm = Math.round(totalGpsTravelKm * 1000) / 1000;
+
   // Per-road calculation
   const roadResults = [];
   let totalPlannedKm  = 0;
@@ -505,6 +518,7 @@ function calculatePlannedVsActual(plan, machine, project, roadMap, rawGpsDocs, o
 
     gpsPointsTotal:   rawGpsDocs.length,
     gpsPointsCleaned: cleanedGps.length,
+    totalGpsTravelKm,
 
     sweepingSignalAvailable: false,
     sweepingNote: 'No hardware sweeping sensor signal available. Coverage based on GPS proximity to road geometry.',

@@ -98,131 +98,147 @@ function SummaryCards({ summary }) {
   );
 }
 
-// ── Map auto-fit ──────────────────────────────────────────────────────────────
-function FitAllRoutes({ allCoords }) {
+// ── Fly-to helper — triggers map pan/zoom to given coords ────────────────────
+function FlyToCoords({ coords }) {
   const map = useMap();
   useEffect(() => {
-    if (allCoords.length < 2) return;
-    try { map.fitBounds(L.latLngBounds(allCoords), { padding: [30, 30] }); } catch (_) {}
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!coords || coords.length < 2) return;
+    try { map.fitBounds(L.latLngBounds(coords), { padding: [40, 40], maxZoom: 17, animate: true }); } catch (_) {}
+  }, [coords, map]);
   return null;
 }
 
 // ── Road map panel ────────────────────────────────────────────────────────────
+function FitBounds({ coords }) {
+  const map = useMap();
+  useEffect(() => {
+    if (coords.length < 2) return;
+    try { map.fitBounds(L.latLngBounds(coords), { padding: [40, 40], maxZoom: 17 }); } catch (_) {}
+  }, [coords, map]);
+  return null;
+}
+
 function RoadMapPanel({ selectedRoad, actualSegments }) {
   const planned = selectedRoad?.plannedRoute || [];
   const actual  = actualSegments || [];
+  const [flyTarget, setFlyTarget] = useState(null); // 'planned' | 'actual' | null
 
-  const allCoords = [
-    ...planned,
-    ...actual.flat(),
-  ];
+  // Flatten all actual points
+  const actualAllPts = actual.flat();
+  const totalActualPts = actualAllPts.length;
 
+  const allCoords = [...planned, ...actualAllPts];
   const center = allCoords.length > 0 ? allCoords[0] : [28.6139, 77.2090];
+
+  // Coords to fly to based on button clicked
+  const flyCoords =
+    flyTarget === 'planned' ? planned :
+    flyTarget === 'actual'  ? actualAllPts :
+    null;
 
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 shadow-sm">
+      {/* Header with clickable Planned / Actual buttons */}
       <div className="flex items-center justify-between px-4 py-2.5"
         style={{ background: `linear-gradient(90deg, ${PURPLE}, #6b4d8a)` }}>
         <h3 className="text-sm font-bold text-white">
           Route Map — {selectedRoad?.roadName || 'All Roads'}
         </h3>
-        <div className="flex items-center gap-3 text-[0.65rem] text-white/80">
-          <span className="flex items-center gap-1.5">
-            <span className="inline-block h-0.5 w-5 rounded bg-blue-400" />Planned
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="inline-block h-0.5 w-5 rounded bg-emerald-400" />Actual
-          </span>
+        <div className="flex items-center gap-2">
+          {/* Planned button */}
+          <button
+            type="button"
+            onClick={() => setFlyTarget(flyTarget === 'planned' ? null : 'planned')}
+            disabled={planned.length < 2}
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[0.65rem] font-semibold transition-colors disabled:opacity-40 ${
+              flyTarget === 'planned'
+                ? 'bg-blue-500 text-white shadow-inner'
+                : 'bg-white/15 text-white hover:bg-white/25'
+            }`}
+          >
+            <span className="inline-block h-1 w-4 rounded" style={{ background: '#93c5fd' }} />
+            Planned
+          </button>
+          {/* Actual button */}
+          <button
+            type="button"
+            onClick={() => setFlyTarget(flyTarget === 'actual' ? null : 'actual')}
+            disabled={totalActualPts < 2}
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[0.65rem] font-semibold transition-colors disabled:opacity-40 ${
+              flyTarget === 'actual'
+                ? 'bg-emerald-500 text-white shadow-inner'
+                : 'bg-white/15 text-white hover:bg-white/25'
+            }`}
+          >
+            <span className="inline-block h-1 w-4 rounded" style={{ background: '#6ee7b7' }} />
+            Actual GPS
+          </button>
         </div>
       </div>
-      <div style={{ height: 360 }}>
+
+      {/* Stats row */}
+      <div className="flex flex-wrap gap-4 border-b border-gray-100 bg-gray-50 px-4 py-2 text-xs">
+        <span>
+          <span className="font-medium text-gray-500">Planned KM: </span>
+          <span className="font-semibold text-blue-700">{selectedRoad?.plannedKm ?? '—'} KM</span>
+        </span>
+        <span>
+          <span className="font-medium text-gray-500">Actual KM: </span>
+          <span className={`font-semibold ${(selectedRoad?.actualKm ?? 0) > 0 ? 'text-emerald-700' : 'text-gray-400'}`}>
+            {selectedRoad?.actualKm ?? 0} KM
+          </span>
+        </span>
+        <span>
+          <span className="font-medium text-gray-500">Coverage: </span>
+          <span className={`font-semibold ${(selectedRoad?.coveragePercent ?? 0) >= 90 ? 'text-emerald-700' : (selectedRoad?.coveragePercent ?? 0) >= 50 ? 'text-amber-600' : 'text-red-600'}`}>
+            {selectedRoad?.coveragePercent ?? 0}%
+          </span>
+        </span>
+        <span>
+          <span className="font-medium text-gray-500">GPS points (actual): </span>
+          <span className="font-semibold text-gray-700">{totalActualPts}</span>
+        </span>
+        {totalActualPts === 0 && (
+          <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-700">
+            ⚠ No actual GPS data for this date
+          </span>
+        )}
+      </div>
+
+      {/* Map */}
+      <div style={{ height: 400 }}>
         <MapContainer center={center} zoom={14} className="h-full w-full" style={{ zIndex: 0 }}>
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          {allCoords.length > 0 && <FitAllRoutes allCoords={allCoords} />}
-          {/* Planned route — blue */}
+          {/* Initial fit to show both planned + actual */}
+          {allCoords.length >= 2 && <FitBounds coords={allCoords} />}
+          {/* Fly to selected route on button click */}
+          {flyCoords && flyCoords.length >= 2 && <FlyToCoords coords={flyCoords} />}
+
+          {/* Planned route — blue, thicker */}
           {planned.length >= 2 && (
-            <Polyline positions={planned} pathOptions={{ color: '#3b82f6', weight: 4, opacity: 0.8 }}>
-              <Tooltip sticky>Planned: {selectedRoad?.roadName}</Tooltip>
+            <Polyline
+              positions={planned}
+              pathOptions={{ color: '#3b82f6', weight: 5, opacity: 0.85 }}
+            >
+              <Tooltip sticky>📋 Planned: {selectedRoad?.roadName}</Tooltip>
             </Polyline>
           )}
-          {/* Actual GPS route — green, broken at gaps */}
-          {actual.map((seg, idx) => (
-            seg.length >= 2 && (
+
+          {/* Actual GPS route — green segments */}
+          {actual.map((seg, idx) =>
+            seg.length >= 2 ? (
               <Polyline
                 key={idx}
                 positions={seg}
-                pathOptions={{ color: '#10b981', weight: 3, opacity: 0.85 }}
+                pathOptions={{ color: '#10b981', weight: 3, opacity: 0.9 }}
               >
-                <Tooltip sticky>Actual GPS Route</Tooltip>
+                <Tooltip sticky>🛣 Actual GPS Track (segment {idx + 1})</Tooltip>
               </Polyline>
-            )
-          ))}
-        </MapContainer>
-      </div>
-    </div>
-  );
-}
-
-// ── All-roads map (overview) ──────────────────────────────────────────────────
-function OverviewMapPanel({ machineResults }) {
-  // Collect all planned routes (colour-coded by status) + all actual segments
-  const plannedLines = [];
-  const actualSegments = [];
-
-  for (const m of machineResults) {
-    for (const r of (m.roads || [])) {
-      if ((r.plannedRoute || []).length >= 2) {
-        const color = r.status === 'completed' ? '#10b981'
-                    : r.status === 'partially_completed' ? '#f59e0b' : '#ef4444';
-        plannedLines.push({ coords: r.plannedRoute, color, name: r.roadName });
-      }
-    }
-    for (const seg of (m.actualRouteSegments || [])) {
-      if (seg.length >= 2) actualSegments.push(seg);
-    }
-  }
-
-  const allCoords = [
-    ...plannedLines.flatMap((l) => l.coords),
-    ...actualSegments.flat(),
-  ];
-  const center = allCoords.length > 0 ? allCoords[0] : [28.6139, 77.2090];
-
-  return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 shadow-sm">
-      <div className="flex items-center justify-between px-4 py-2.5"
-        style={{ background: `linear-gradient(90deg, ${PURPLE}, #6b4d8a)` }}>
-        <h3 className="text-sm font-bold text-white">Overview Map</h3>
-        <div className="flex items-center gap-3 text-[0.65rem] text-white/80">
-          <span className="flex items-center gap-1.5"><span className="inline-block h-1.5 w-4 rounded bg-emerald-400" />Completed</span>
-          <span className="flex items-center gap-1.5"><span className="inline-block h-1.5 w-4 rounded bg-amber-400" />Partial</span>
-          <span className="flex items-center gap-1.5"><span className="inline-block h-1.5 w-4 rounded bg-red-400" />Not Done</span>
-          <span className="flex items-center gap-1.5"><span className="inline-block h-0.5 w-4 rounded bg-white/70" />Actual GPS</span>
-        </div>
-      </div>
-      <div style={{ height: 400 }}>
-        <MapContainer center={center} zoom={13} className="h-full w-full" style={{ zIndex: 0 }}>
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          {allCoords.length > 0 && <FitAllRoutes allCoords={allCoords} />}
-          {plannedLines.map((l, i) => (
-            <Polyline key={`p-${i}`} positions={l.coords}
-              pathOptions={{ color: l.color, weight: 4, opacity: 0.8 }}>
-              <Tooltip sticky>{l.name}</Tooltip>
-            </Polyline>
-          ))}
-          {actualSegments.map((seg, i) => (
-            seg.length >= 2 && (
-              <Polyline key={`a-${i}`} positions={seg}
-                pathOptions={{ color: '#6366f1', weight: 2, opacity: 0.7, dashArray: '4 3' }} />
-            )
-          ))}
+            ) : null
+          )}
         </MapContainer>
       </div>
     </div>
@@ -298,6 +314,10 @@ function MachineCard({ machine, selectedRoadId, onSelectRoad }) {
               <div>
                 <span className="font-medium text-gray-500">GPS pts </span>
                 <span className="text-gray-700">{machine.gpsPointsCleaned}/{machine.gpsPointsTotal} cleaned</span>
+              </div>
+              <div>
+                <span className="font-medium text-gray-500">Total GPS Travel </span>
+                <span className="font-semibold text-indigo-700">{round2(machine.totalGpsTravelKm ?? 0)} KM</span>
               </div>
               {!machine.sweepingSignalAvailable && (
                 <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[0.65rem] font-medium text-amber-700">
@@ -582,9 +602,6 @@ export default function PlannedVsActual() {
             </p>
             <SummaryCards summary={result.summary} />
           </div>
-
-          {/* Overview map */}
-          <OverviewMapPanel machineResults={result.machines} />
 
           {/* Per-road detail map (when a road is selected) */}
           {selectedRoadData && (
